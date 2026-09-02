@@ -321,6 +321,91 @@ def execute_trade(trade_id: int, execution_price: float, executed_by: str = "exe
         result["reason"] = result["message"]
     
     return result
+def execute_trade_with_adapter(trade_id: int, execution_price: float, executed_by: str = "execution_gateway") -> Dict[str, Any]:
+    """
+    Execute trade through the exchange adapter.
+    
+    This function:
+    1. Calls execute_trade() to validate and transition to EXECUTED
+    2. Calls the configured exchange adapter to execute the order
+    3. Returns combined result
+    
+    SAFETY: Adapter is selected based on TRADING_MODE config.
+    Default is "paper" mode (dry-run, no real execution).
+    
+    Args:
+        trade_id: Trade ID to execute
+        execution_price: Price at which trade was executed
+        executed_by: Actor performing execution
+    
+    Returns:
+        Combined result from governance validation and adapter execution
+    """
+    from config import TRADING_MODE
+    from exchange_adapter import get_adapter
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Step 1: Validate and transition trade state
+    governance_result = execute_trade(trade_id, execution_price, executed_by)
+    
+    if governance_result.get("status") != "SUCCESS":
+        # Governance validation failed - do not call adapter
+        logger.warning(f"[{TRADING_MODE.upper()}] Governance validation failed for trade {trade_id}: {governance_result}")
+        return governance_result
+    
+    # Step 2: Get trade details for adapter
+    trade = _read_trade_from_db(trade_id)
+    if not trade:
+        return {"status": "ERROR", "reason": f"Trade {trade_id} not found after execution."}
+    
+    # Step 3: Build trade intent for adapter
+    trade_intent = {
+        "trade_id": trade_id,
+        "symbol": trade.get("symbol"),
+        "side": trade.get("side"),
+        "quantity": trade.get("quantity"),
+        "entry_price": execution_price,  # Use actual execution price
+        "stop_loss": trade.get("stop_loss"),
+        "take_profit": trade.get("take_profit"),
+        "proposal_hash": trade.get("proposal_hash")
+    }
+    
+    # Step 4: Call exchange adapter
+    try:
+        adapter = get_adapter(TRADING_MODE)
+        adapter_result = adapter.execute_order(trade_intent)
+        
+        logger.info(f"[{TRADING_MODE.upper()}] Adapter execution result: {adapter_result}")
+        
+        # Combine results
+        return {
+            "status": "SUCCESS",
+            "trade_id": trade_id,
+            "new_status": governance_result.get("new_status"),
+            "governance": governance_result,
+            "execution": adapter_result,
+            "mode": TRADING_MODE
+        }
+    
+    except Exception as e:
+        logger.error(f"[{TRADING_MODE.upper()}] Adapter execution failed: {e}")
+        # Adapter failure does not roll back governance state
+        # Trade is already EXECUTED in governance, but adapter failed
+        return {
+            "status": "ERROR",
+            "trade_id": trade_id,
+            "new_status": governance_result.get("new_status"),
+            "governance": governance_result,
+            "execution": {
+                "status": "ERROR",
+                "message": str(e),
+                "mode": TRADING_MODE
+            },
+            "mode": TRADING_MODE,
+            "reason": f"Governance execution succeeded but adapter failed: {e}"
+        }
 
 def dashboard_approve_trade(trade_id: int) -> Dict[str, Any]:
     trade = _read_trade_from_db(trade_id)  # Use DB to avoid cache

@@ -1,5 +1,5 @@
 """
-TradeGuard AI - Central Configuration (Sprint 5).
+TradeGuard AI - Central Configuration (Sprint 6).
 Single source of truth for database paths, constants, and schema migration.
 """
 import os
@@ -14,9 +14,9 @@ DB_PATH = os.environ.get("ROBO_SHOPPER_DB", os.path.join(BASE_DIR, "data", "trad
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 # --- Risk Constants (DECIMAL format) ---
-MAX_RISK_PER_TRADE = 0.02      # 2%
-MAX_DAILY_DRAWDOWN = 0.05      # 5%
-MAX_OPEN_EXPOSURE = 0.20       # 20%
+MAX_RISK_PER_TRADE = 0.02    # 2%
+MAX_DAILY_DRAWDOWN = 0.05    # 5%
+MAX_OPEN_EXPOSURE = 0.20     # 20%
 CORE_ASSETS = ["BTC", "ETH", "SOL"]
 
 # --- Policy Version (for hash binding) ---
@@ -24,6 +24,59 @@ POLICY_VERSION = "1.0.0"
 
 # --- Default expiration for proposals ---
 PROPOSAL_EXPIRY_HOURS = 24
+
+# ------------------------------------------------------------------
+# TRADING MODE CONFIGURATION
+# ------------------------------------------------------------------
+# TRADING_MODE: "paper" (default, safe) or "live" (requires explicit opt-in)
+# ADAPTER selection is based on TRADING_MODE
+# 
+# SAFETY: Default is "paper" - no real money at risk
+# To enable live trading, set TRADING_MODE=live in .env AND implement exchange adapter
+# ------------------------------------------------------------------
+
+TRADING_MODE = os.environ.get("TRADING_MODE", "paper").lower()
+
+# Validate trading mode
+if TRADING_MODE not in ["paper", "live"]:
+    raise ValueError(
+        f"Invalid TRADING_MODE: {TRADING_MODE}. "
+        f"Must be 'paper' (default) or 'live'."
+    )
+
+# Log trading mode on startup
+import logging
+logger = logging.getLogger(__name__)
+logger.warning(f"⚠️  TRADING MODE: {TRADING_MODE.upper()}")
+if TRADING_MODE == "live":
+    logger.error("🚨 LIVE TRADING ENABLED - REAL MONEY AT RISK 🚨")
+
+# ------------------------------------------------------------------
+# BINANCE CONFIGURATION
+# ------------------------------------------------------------------
+# Binance API credentials must be set in environment variables
+# NEVER commit real credentials to source code
+# 
+# Required for live mode:
+# - BINANCE_API_KEY: Your Binance API key
+# - BINANCE_API_SECRET: Your Binance API secret
+# - BINANCE_USE_MAINNET: "true" for mainnet, "false" for testnet (default)
+# ------------------------------------------------------------------
+
+BINANCE_API_KEY = os.environ.get("BINANCE_API_KEY")
+BINANCE_API_SECRET = os.environ.get("BINANCE_API_SECRET")
+BINANCE_USE_MAINNET = os.environ.get("BINANCE_USE_MAINNET", "false").lower() == "true"
+
+# Log Binance configuration
+if TRADING_MODE == "live":
+    if not BINANCE_API_KEY or not BINANCE_API_SECRET:
+        logger.error("🚨 LIVE MODE ENABLED BUT BINANCE CREDENTIALS MISSING 🚨")
+        logger.error("Set BINANCE_API_KEY and BINANCE_API_SECRET in environment")
+    else:
+        if BINANCE_USE_MAINNET:
+            logger.error("🚨 BINANCE MAINNET - REAL MONEY AT RISK 🚨")
+        else:
+            logger.warning("⚠️  BINANCE TESTNET - Safe demonstration mode")
 
 # ------------------------------------------------------------------
 # SCHEMA MIGRATION (ensures all columns exist)

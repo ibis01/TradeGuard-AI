@@ -131,4 +131,4 @@ def check_correlation_risk(proposed_symbol: str) -> Dict[str, Any]:
         return {"status": "PASSED", "reason": "No correlation conflicts detected."}
     except RuntimeError as e:
         # Fail-closed: cannot verify correlation without position data
-        return {"status": "REJECTED", "reason": f"Correlation check failed: {e}"}
+        return {"status": "REJECTED", "reason": f"Correlation check failed: {e}"}          
