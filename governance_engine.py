@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robo-Shopper V4 - Governance Engine (Final Production Build).
+TradeGuard AI - Governance Engine (Final Production Build).
 """
 import sqlite3
 import hashlib

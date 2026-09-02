@@ -1,4 +1,4 @@
-"""Robo-Shopper V4 - Multi-timeframe confluence + regime detection (Sprint 3)."""
+"""TradeGuard AI - Multi-timeframe confluence + regime detection (Sprint 3)."""
 import json
 import statistics
 import urllib.request

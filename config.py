@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - Central Configuration (Sprint 5).
+TradeGuard AI - Central Configuration (Sprint 5).
 Single source of truth for database paths, constants, and schema migration.
 """
 import os

@@ -2,7 +2,7 @@
 
 ## OBJECTIVE
 
-Transform Robo-Shopper into a polished, genuinely useful AI finance agent capable of competing for a top position in the Orion Builder Hackathon.
+Transform TradeGuard AI into a polished, genuinely useful AI finance agent capable of competing for a top position in the Orion Builder Hackathon.
 
 The goal is NOT maximum features.
 
@@ -13,19 +13,19 @@ USEFULNESS + EXECUTION + ORIGINALITY + TRUST + DEMONSTRABILITY.
 
 ## 1. PRODUCT DEFINITION
 
-Robo-Shopper is an AI finance copilot that autonomously investigates financial opportunities and risks, produces evidence-backed proposals, applies deterministic risk and governance policies, and requires explicit human authorization before consequential execution.
+TradeGuard AI is an AI finance copilot that autonomously investigates financial opportunities and risks, produces evidence-backed proposals, applies deterministic risk and governance policies, and requires explicit human authorization before consequential execution.
 
 Core principle:
 
 AI INVESTIGATES → SYSTEM VERIFIES → POLICY GOVERNS → HUMAN AUTHORIZES → GATEWAY EXECUTES → MEMORY RECORDS.
 
-Do not turn Robo-Shopper into a generic chatbot.
+Do not turn TradeGuard AI into a generic chatbot.
 
 ---
 
 ## 2. AGENTIC BEHAVIOR
 
-Robo-Shopper must demonstrate genuine agent behavior.
+TradeGuard AI must demonstrate genuine agent behavior.
 
 For every meaningful task:
 
@@ -321,7 +321,7 @@ Recommended flow:
 User:
 "Investigate ETH and determine whether a $500 position fits my current risk policy."
 
-Robo-Shopper:
+TradeGuard AI:
 
 1. Understands request.
 2. Investigates market.
@@ -337,7 +337,7 @@ Robo-Shopper:
 12. Authorization is verified.
 13. Execution gateway performs a safe paper/dry-run or supported execution.
 14. Result is recorded.
-15. Robo-Shopper updates memory.
+15. TradeGuard AI updates memory.
 
 The complete workflow should be demonstrable in approximately 2–3 minutes.
 
@@ -360,7 +360,7 @@ Differentiate around:
 
 The strongest product statement should communicate:
 
-"Robo-Shopper does not blindly trust the AI. It investigates with the AI, verifies with deterministic systems, and requires human authorization before consequential action."
+"TradeGuard AI does not blindly trust the AI. It investigates with the AI, verifies with deterministic systems, and requires human authorization before consequential action."
 
 ---
 
@@ -388,7 +388,7 @@ The judge must be able to understand what is real.
 
 README must contain:
 
-1. What Robo-Shopper is.
+1. What TradeGuard AI is.
 2. Why it exists.
 3. Architecture.
 4. Agent workflow.
@@ -438,7 +438,7 @@ There must be one canonical implementation for each critical capability.
 
 ## 18. QUALITY GATE
 
-Before declaring Robo-Shopper hackathon-ready, verify:
+Before declaring TradeGuard AI hackathon-ready, verify:
 
 ### Agent
 [ ] Genuine tool-using agent
@@ -496,7 +496,7 @@ Before declaring Robo-Shopper hackathon-ready, verify:
 
 ## FINAL PRINCIPLE
 
-Do not optimize Robo-Shopper to LOOK impressive.
+Do not optimize TradeGuard AI to LOOK impressive.
 
 Optimize it to BE impressive when a technically competent judge tries to break it.
 

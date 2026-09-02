@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robo-Shopper V4 - Agent Entry Point
+TradeGuard AI - Agent Entry Point
 """
 import sys
 import re
@@ -76,7 +76,7 @@ def _parse_natural_language_query(query: str) -> dict:
     return result
 
 def main():
-    print_header("🤖 Robo-Shopper Agent - Autonomous Investigation")
+    print_header("🤖 TradeGuard AI Agent - Autonomous Investigation")
     print("💡 Tip: You can enter parameters one-by-one, OR paste a natural language query")
     print("        like: 'Investigate BTC long 0.01 at entry 60000 stop 59500'\n")
     
@@ -162,7 +162,7 @@ def main():
 
     print_header("✨ Investigation Complete")
     print("Full pipeline executed successfully:\n  1. ✅ Agent investigated market conditions\n  2. ✅ Deterministic risk engine validated proposal\n  3. ✅ Cryptographic hash bound to proposal\n  4. ✅ Human operator approved via secure token\n  5. ✅ Execution gateway verified hash integrity\n  6. ✅ Trade executed with full audit trail")
-    print(f"\nTrade ID: {trade_id}\nProposal Hash: {proposal_hash}\n\n🎯 Robo-Shopper: AI investigates, system verifies, human authorizes.\n")
+    print(f"\nTrade ID: {trade_id}\nProposal Hash: {proposal_hash}\n\n🎯 TradeGuard AI: AI investigates, system verifies, human authorizes.\n")
 
 if __name__ == "__main__":
     try: main()

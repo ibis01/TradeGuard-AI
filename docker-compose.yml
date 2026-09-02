@@ -10,7 +10,7 @@ services:
     # FastAPI Dashboard (runs on port 8003)
   dashboard:
     build: .
-    container_name: robo-shopper-dashboard
+    container_name: tradeguard-ai-dashboard
     command: uvicorn dashboard:app --host 0.0.0.0 --port 8003
     environment:
       - OLLAMA_HOST=http://host.docker.internal:11434

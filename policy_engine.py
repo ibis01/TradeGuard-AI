@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - Policy Engine (Sprint 5).
+TradeGuard AI - Policy Engine (Sprint 5).
 Centralized hard constraints. The LLM NEVER defines its own limits.
 """
 from typing import Dict, Any

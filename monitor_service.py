@@ -11,7 +11,7 @@ from proactive_alerts_mcp import _monitor_markets
 logging.basicConfig(level=logging.INFO)
 
 if __name__ == "__main__":
-    print("👁️  Robo-Shopper Voice: standalone 24/7 monitor starting...")
+    print("👁️  TradeGuard AI Voice: standalone 24/7 monitor starting...")
     try:
         asyncio.run(_monitor_markets())
     except KeyboardInterrupt:

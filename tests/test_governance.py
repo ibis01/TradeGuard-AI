@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - Governance Integration Test (Sprint 5).
+TradeGuard AI - Governance Integration Test (Sprint 5).
 Full end-to-end pipeline.
 """
 import pytest

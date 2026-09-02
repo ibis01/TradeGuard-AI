@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robo-Shopper - Database Schema Reset Script.
+TradeGuard AI - Database Schema Reset Script.
 Drops and recreates all tables with the correct schema for the current codebase.
 """
 import sqlite3

@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - Adversarial Security Tests (Sprint 5).
+TradeGuard AI - Adversarial Security Tests (Sprint 5).
 Proves that governance CANNOT be bypassed using the public API.
 """
 import pytest

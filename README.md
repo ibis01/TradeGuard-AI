@@ -1,12 +1,12 @@
-# Robo-Shopper
+# TradeGuard AI
 
 **A Human-Governed AI Finance Agent with Deterministic Risk Controls**
 
-> _"Robo-Shopper does not blindly trust the AI. It investigates with the AI, verifies with deterministic systems, and requires human authorization before consequential action."_
+> _"TradeGuard AI does not blindly trust the AI. It investigates with the AI, verifies with deterministic systems, and requires human authorization before consequential action."_
 
 ## 🎯 What It Is
 
-Robo-Shopper is an AI finance copilot that autonomously investigates financial opportunities, produces evidence-backed proposals, applies deterministic risk and governance policies, and requires explicit human authorization before execution.
+TradeGuard AI is an AI finance copilot that autonomously investigates financial opportunities, produces evidence-backed proposals, applies deterministic risk and governance policies, and requires explicit human authorization before execution.
 
 It solves the "black box" problem of AI trading agents by separating concerns: the LLM handles investigation and synthesis, while deterministic code handles risk calculation, policy enforcement, and cryptographic execution gating.
 
@@ -20,7 +20,7 @@ AI INVESTIGATES → SYSTEM VERIFIES → POLICY GOVERNS → HUMAN AUTHORIZES → 
 
 Most AI trading agents are dangerous black boxes that blindly trust LLM outputs for financial execution. If the LLM hallucinates a risk metric or ignores a stop-loss, the user loses money.
 
-Robo-Shopper moves AI agents from demos to real products by enforcing **trust through architecture**:
+TradeGuard AI moves AI agents from demos to real products by enforcing **trust through architecture**:
 
 - **AI investigates** market conditions and proposes trades.
 - **Deterministic code** calculates risk and enforces policy (2% risk cap, 20% exposure cap).
@@ -67,7 +67,7 @@ Robo-Shopper moves AI agents from demos to real products by enforcing **trust th
 
 ## 🤖 Agent Workflow
 
-Robo-Shopper demonstrates genuine agentic behavior, not just a chatbot interface:
+TradeGuard AI demonstrates genuine agentic behavior, not just a chatbot interface:
 
 1. **Understands Objective:** Parses natural language queries (e.g., _"Investigate BTC long 0.01 at entry 60000 stop 59500"_).
 2. **Plans Investigation:** Determines what market data and portfolio context is required.
@@ -114,7 +114,7 @@ We provide a bulletproof setup script that handles environment initialization, d
 
 ```bash
 git clone <repository-url>
-cd robo-shopper
+cd tradeguard-ai
 ./setup.sh
 ```
 
@@ -217,7 +217,7 @@ To maintain absolute transparency for judges and users:
 
 ## 🔗 Orion Integration Readiness
 
-Robo-Shopper is designed to be deployed as a verified agent on the Orion network.
+TradeGuard AI is designed to be deployed as a verified agent on the Orion network.
 
 - **Deterministic Outputs:** The risk engine ensures the agent never hallucinates financial parameters.
 - **Structured Tool Use:** The agent's investigation trace (plan → tool call → result → deterministic calculation) is fully observable and auditable.

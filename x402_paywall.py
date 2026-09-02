@@ -1,4 +1,4 @@
-"""Robo-Shopper V3 - x402 Memory Paywall.
+"""TradeGuard AI V3 - x402 Memory Paywall.
 Exposes the agent's trade history to the world, but demands payment via x402.
 """
 import sqlite3
@@ -17,7 +17,7 @@ async def get_stats(x_payment: str | None = Header(None)):
             status_code=402,
             content={
                 "error": "Payment Required",
-                "message": "To query the Robo-Shopper memory bank, you must pay 0.05 USDC.",
+                "message": "To query the TradeGuard AI memory bank, you must pay 0.05 USDC.",
                 "payment_protocol": "x402",
                 "recipient_address": "0x8d6538B16d8f7B1f4335f3874fc12bE377F7c1cc",
                 "amount": "0.05",
@@ -39,7 +39,7 @@ async def get_stats(x_payment: str | None = Header(None)):
     win_rate = (wins / total * 100) if total > 0 else 0
     
     return {
-        "agent": "Robo-Shopper V3",
+        "agent": "TradeGuard AI V3",
         "total_trades": total,
         "wins": wins,
         "win_rate_pct": round(win_rate, 2),

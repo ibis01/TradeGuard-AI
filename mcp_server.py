@@ -6,7 +6,7 @@ import pandas as pd
 from datetime import datetime
 from mcp.server.fastmcp import FastMCP
 
-mcp = FastMCP("Robo-Shopper V2")
+mcp = FastMCP("TradeGuard AI V2")
 
 db = sqlite3.connect('robo_memory.db', check_same_thread=False)
 cursor = db.cursor()
@@ -85,5 +85,5 @@ async def get_agent_memory() -> str:
                        "compliance_rate": f"{(approved/total)*100:.1f}%" if total else "N/A"})
 
 if __name__ == "__main__":
-    print("Starting Robo-Shopper V2 (Live Data + SQLite Memory)...")
+    print("Starting TradeGuard AI V2 (Live Data + SQLite Memory)...")
     mcp.run(transport="sse")

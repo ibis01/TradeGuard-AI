@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robo-Shopper V4 - Hardened Risk Management MCP.
+TradeGuard AI - Hardened Risk Management MCP.
 Implements deterministic risk controls that CANNOT be bypassed by the LLM.
 - 2% hard cap on per-trade risk.
 - Validates all financial inputs.

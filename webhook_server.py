@@ -1,4 +1,4 @@
-"""Robo-Shopper V4 - TradingView webhook ingest (Sprint 8)."""
+"""TradeGuard AI - TradingView webhook ingest (Sprint 8)."""
 import os
 import sqlite3
 from datetime import datetime, timezone

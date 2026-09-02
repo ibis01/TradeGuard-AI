@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - Formal Governance Schemas (Sprint 5).
+TradeGuard AI - Formal Governance Schemas (Sprint 5).
 Single source of truth for all data models.
 """
 from pydantic import BaseModel, Field, field_validator, model_validator

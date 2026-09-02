@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robo-Shopper V4 - Agentic Finance Copilot.
+TradeGuard AI - Agentic Finance Copilot.
 Implements the Institutional Desk UX: Agent investigates in terminal, 
 human authorizes via web dashboard.
 """
@@ -46,7 +46,7 @@ else:
 print(f"🔌 LLM provider: {_PROVIDER} | model: {MODEL}")
 
 SYSTEM_PROMPT = """
-You are Robo-Shopper, an institutional-grade, genuinely agentic AI finance copilot. 
+You are TradeGuard AI, an institutional-grade, genuinely agentic AI finance copilot. 
 You autonomously investigate, synthesize evidence, and propose trades, but you NEVER bypass deterministic safety controls.
 
 CORE PRINCIPLE:
@@ -100,7 +100,7 @@ def mcp_to_openai_tools(mcp_tools):
     return tools
 
 async def run_qwen_agent():
-    print("🔌 Connecting to Robo-Shopper Finance Copilot MCP server...")
+    print("🔌 Connecting to TradeGuard AI Finance Copilot MCP server...")
     server_params = StdioServerParameters(command=sys.executable, args=["main_server.py"], env={**os.environ, "ROBO_VOICE": "off"})
 
     async with stdio_client(server_params) as (read, write):
@@ -127,7 +127,7 @@ async def run_qwen_agent():
                         messages.append(msg_dict)
 
                         if not msg.tool_calls:
-                            print(f"\n🤖 Robo-Shopper:\n{msg.content}\n")
+                            print(f"\n🤖 TradeGuard AI:\n{msg.content}\n")
                             if msg.content and "onchainos" in msg.content and not _rejected:
                                 print("\n✅ Trade approved and execution command generated. Copy the command above to execute the dry-run.")
                             break

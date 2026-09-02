@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robo-Shopper V4 - Universal MCP Tool Registry.
+TradeGuard AI - Universal MCP Tool Registry.
 Exposes ALL tools: Market Intel, Risk, Memory, Execution, Governance.
 Governance is enforced via explicit tool routing.
 TRUST BOUNDARY: Portfolio balance is never accepted from LLM.

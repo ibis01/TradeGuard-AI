@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Live integration test for Robo-Shopper.
+Live integration test for TradeGuard AI.
 Assumes dashboard server is running on localhost:8003.
 Uses pytest fixture for authenticated session with CSRF token.
 """
@@ -192,7 +192,7 @@ def test_full_pipeline(session):
 
 if __name__ == "__main__":
     import sys
-    print("\n🚀 Starting live integration test against running Robo-Shopper...")
+    print("\n🚀 Starting live integration test against running TradeGuard AI...")
     if not check_server():
         print("\n❌ Dashboard server is not running!")
         print("   Start it in another terminal:")

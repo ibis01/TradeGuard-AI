@@ -1,4 +1,4 @@
-"""Robo-Shopper V3 - Agentic Treasury."""
+"""TradeGuard AI V3 - Agentic Treasury."""
 import os
 import sqlite3
 from datetime import datetime, timezone

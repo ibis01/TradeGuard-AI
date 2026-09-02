@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - One-Time Approval Tokens (Sprint 5).
+TradeGuard AI - One-Time Approval Tokens (Sprint 5).
 Transaction‑aware token validation for atomic approval.
 """
 import secrets

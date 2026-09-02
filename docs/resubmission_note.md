@@ -1,6 +1,6 @@
-# Resubmission Note — Robo-Shopper v2 (Finance Copilot)
+# Resubmission Note — TradeGuard AI v2 (Finance Copilot)
 
-Previous submission: Robo-Shopper v1.
+Previous submission: TradeGuard AI v1.
 This is not a new entry — it is a full architectural upgrade of our
 existing ASP into the Finance Copilot category.
 

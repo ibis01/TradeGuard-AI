@@ -5,7 +5,7 @@ import httpx
 from datetime import datetime, timezone
 from fastmcp import FastMCP
 
-mcp = FastMCP("Robo-Shopper-ASP")
+mcp = FastMCP("TradeGuard AI-ASP")
 
 # --- 📓 The Magic Diary ---
 AUDIT_FILE = "audit.jsonl"

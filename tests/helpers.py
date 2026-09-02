@@ -1,5 +1,5 @@
 """
-Shared test helpers for Robo-Shopper governance tests.
+Shared test helpers for TradeGuard AI governance tests.
 """
 import sqlite3
 from config import DB_PATH

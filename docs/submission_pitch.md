@@ -1,4 +1,4 @@
-# Submission pitch — Robo-Shopper Finance Copilot
+# Submission pitch — TradeGuard AI Finance Copilot
 
 ## One-liner
 A governed, memory-aware trading copilot on X Layer that enforces a 2%
@@ -10,7 +10,7 @@ it has no memory of its own mistakes, no hard risk limit, and no human
 override. When it's wrong, it's wrong repeatedly and expensively.
 
 ## Our answer
-Robo-Shopper separates the four jobs a finance copilot must do, and makes
+TradeGuard AI separates the four jobs a finance copilot must do, and makes
 each one auditable:
 
 - **Analyze** — live spot + derivatives context (funding, OI, crowding bias)

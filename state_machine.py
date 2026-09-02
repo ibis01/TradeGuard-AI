@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - Single State-Transition Authority (Sprint 5).
+TradeGuard AI - Single State-Transition Authority (Sprint 5).
 ONE function responsible for EVERY state mutation.
 Supports external connections for atomic transactions.
 """

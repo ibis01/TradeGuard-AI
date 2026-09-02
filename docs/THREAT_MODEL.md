@@ -1,4 +1,4 @@
-# Robo-Shopper Threat Model
+# TradeGuard AI Threat Model
 
 > **Scope:** Governance layer for an AI-proposed, human-approved trading copilot.
 > **Status:** Paper-trading prototype. This model describes the security invariants

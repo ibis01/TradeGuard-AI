@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - Trade Memory MCP (Sprint 5).
+TradeGuard-AI - Trade Memory MCP (Sprint 5).
 Manages the SQLite ledger. 
 State mutations are delegated to state_machine.py.
 """
@@ -9,7 +9,6 @@ from typing import Optional, Dict, Any
 
 from config import DB_PATH
 from schemas import TradeStatus
-from state_machine import transition_trade, ActorType
 from risk_management_mcp import _get_real_portfolio_balance
 
 # ------------------------------------------------------------------
@@ -100,16 +99,3 @@ def get_trade_history(limit: int = 10) -> Dict[str, Any]:
             "status": row[6], "pnl": row[7], "created": row[8], "executed": row[9]
         })
     return {"trades": trades, "count": len(trades)}
-
-# ------------------------------------------------------------------
-# RECORD EXECUTION (deprecated – use governance_engine.execute_trade)
-# ------------------------------------------------------------------
-def record_execution(trade_id: int, execution_price: float, feedback: Optional[str] = None):
-    result = transition_trade(
-        trade_id,
-        TradeStatus.EXECUTED,
-        ActorType.EXECUTION_GATEWAY,
-        {"execution_price": execution_price, "feedback": feedback},
-        require_approval_hash="legacy"
-    )
-    return result

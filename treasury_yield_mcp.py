@@ -1,4 +1,4 @@
-"""Robo-Shopper V4 - Automated Yield Optimization (Sprint 9)."""
+"""TradeGuard AI - Automated Yield Optimization (Sprint 9)."""
 import os
 import sqlite3
 from datetime import datetime, timezone

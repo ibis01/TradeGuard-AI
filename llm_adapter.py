@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - LLM-agnostic adapter (Sprint 6).
+TradeGuard AI - LLM-agnostic adapter (Sprint 6).
 One interface, any brain. Configure via env:
   LLM_PROVIDER = ollama | groq | openai | openrouter | dashscope | deepseek | mistral | together | fireworks | perplexity | cerebras | sambanova | novita | anyscale
   LLM_MODEL    = any model the provider serves (default per provider)

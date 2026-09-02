@@ -1,4 +1,4 @@
-"""Robo-Shopper V4 - TradingView trigger reader (Sprint 8)."""
+"""TradeGuard AI - TradingView trigger reader (Sprint 8)."""
 import os
 import sqlite3
 

@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - Adversarial Security Tests (Sprint 5).
+TradeGuard-AI - Adversarial Security Tests (Sprint 5).
 Proves that governance CANNOT be bypassed using the public API.
 """
 import pytest
@@ -17,7 +17,6 @@ from governance_engine import request_approval, approve_trade, execute_trade
 from trade_memory_mcp import propose_trade, get_trade
 from config import DB_PATH
 
-
 @pytest.fixture
 def clean_db():
     conn = sqlite3.connect(DB_PATH)
@@ -34,7 +33,6 @@ def clean_db():
     conn.commit()
     conn.close()
 
-
 def create_proposed_trade(symbol="BTC", side="long", quantity=0.01, entry=60000, stop=59500, reasoning="test"):
     prop = propose_trade(symbol, side, quantity, entry, stop, reasoning=reasoning)
     
@@ -50,16 +48,6 @@ def create_proposed_trade(symbol="BTC", side="long", quantity=0.01, entry=60000,
     conn.close()
     
     return prop["trade_id"]
-
-    from config import DB_PATH
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute(
-        "UPDATE trades SET portfolio_balance = 10000.0 WHERE id = ?",
-        (prop["trade_id"],)
-    )
-    conn.commit()
-    conn.close()
-
 
 # ------------------------------------------------------------------
 # TESTS: UNAUTHORIZED ACTORS
@@ -289,3 +277,109 @@ def test_approve_trade_rejects_post_token_trade_tampering(clean_db):
     # Ensure the trade is still in AWAITING_APPROVAL (not approved)
     trade = get_trade(tid)
     assert trade["status"] == TradeStatus.AWAITING_APPROVAL.value
+
+
+# ------------------------------------------------------------------
+# TESTS: TASK 002B — VERIFIED GOVERNANCE HARDENING REGRESSION
+# ------------------------------------------------------------------
+
+def test_exposure_guardrail_executes_real_calculation(clean_db):
+    """
+    TEST 1: Verify the exposure guardrail executes its intended calculation path.
+    Must return PASSED or REJECTED (not ERROR) under controlled conditions.
+    """
+    from guardrails_mcp import check_exposure_limit, _get_open_positions
+
+    # Verify function reference resolves (no NameError)
+    positions = _get_open_positions()
+    assert isinstance(positions, list)
+
+    # Test with small position that should PASS (0.01 BTC at $60k = $600 exposure)
+    # With $10k portfolio balance (set by create_proposed_trade), this is 6% exposure
+    result = check_exposure_limit(proposed_size=0.01, proposed_entry=60000.0)
+    
+    # Must return PASSED or REJECTED, not ERROR
+    assert result["status"] in ("PASSED", "REJECTED"), \
+        f"Expected PASSED or REJECTED, got {result['status']}: {result.get('reason')}"
+    
+    # Verify calculation fields are present
+    assert "total_exposure_usd" in result
+    assert "portfolio_balance" in result
+
+
+def test_exposure_guardrail_fails_closed_on_db_error(clean_db, monkeypatch):
+    """
+    TEST 2: Verify exposure guardrail fails closed when database cannot be read.
+    Must return REJECTED, not PASSED or empty list.
+    """
+    from guardrails_mcp import check_exposure_limit
+    import guardrails_mcp
+    
+    # Mock _get_open_positions to raise RuntimeError
+    def mock_get_positions():
+        raise RuntimeError("Database connection failed")
+    
+    monkeypatch.setattr(guardrails_mcp, "_get_open_positions", mock_get_positions)
+    
+    result = check_exposure_limit(proposed_size=0.01, proposed_entry=60000.0)
+    
+    # Must fail closed with REJECTED status
+    assert result["status"] == "REJECTED"
+    assert "failed" in result["reason"].lower() or "error" in result["reason"].lower()
+
+
+def test_unapproved_trade_cannot_execute_via_authority(clean_db):
+    """
+    TEST 3: A trade that has NOT completed the full approval flow
+    cannot be executed through the authoritative execution path.
+    """
+    from governance_engine import execute_trade
+
+    tid = create_proposed_trade()
+    # Trade is PROPOSED — never screened, never approved
+    result = execute_trade(tid, execution_price=60100.0)
+    assert result["status"] == "REJECTED"
+    assert "must be 'approved'" in result["reason"].lower() or "no proposal hash" in result["reason"].lower()
+
+
+def test_legacy_execution_path_does_not_exist(clean_db):
+    """
+    TEST 4: The legacy record_execution bypass has been eliminated.
+    The function must not exist in trade_memory_mcp.
+    This proves no second execution authority exists.
+    """
+    import trade_memory_mcp
+
+    assert not hasattr(trade_memory_mcp, "record_execution"), (
+        "FAIL: record_execution still exists. "
+        "There must be exactly ONE authoritative execution path: "
+        "governance_engine.execute_trade()"
+    )
+
+
+def test_proposed_trade_cannot_execute(clean_db):
+    """State integrity: PROPOSED → EXECUTED is forbidden."""
+    from governance_engine import execute_trade
+    tid = create_proposed_trade()
+    result = execute_trade(tid, execution_price=60100.0)
+    assert result["status"] == "REJECTED"
+
+
+def test_awaiting_approval_cannot_execute_t002b(clean_db):
+    """State integrity: AWAITING_APPROVAL → EXECUTED is forbidden."""
+    from governance_engine import execute_trade
+    tid = create_proposed_trade()
+    # Move to AWAITING_APPROVAL but do not approve
+    request_approval(tid)
+    result = execute_trade(tid, execution_price=60100.0)
+    assert result["status"] == "REJECTED"
+
+
+def test_rejected_trade_cannot_execute_t002b(clean_db):
+    """State integrity: REJECTED → EXECUTED is forbidden."""
+    from governance_engine import execute_trade
+    from state_machine import transition_trade
+    tid = create_proposed_trade()
+    transition_trade(tid, TradeStatus.REJECTED, ActorType.RISK_ENGINE)
+    result = execute_trade(tid, execution_price=60100.0)
+    assert result["status"] == "REJECTED"

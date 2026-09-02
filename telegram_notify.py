@@ -1,4 +1,4 @@
-"""Robo-Shopper V4 - Telegram Push Notifications (Sprint 7)."""
+"""TradeGuard AI - Telegram Push Notifications (Sprint 7)."""
 import os
 
 def _load_env():

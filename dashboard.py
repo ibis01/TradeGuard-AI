@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - Read-only dashboard with local operator authentication & CSRF protection.
+TradeGuard AI - Read-only dashboard with local operator authentication & CSRF protection.
 """
 import os
 import sys
@@ -164,7 +164,7 @@ LOGIN_PAGE = """
 <!doctype html>
 <html>
 <head>
-    <title>Robo-Shopper — Login</title>
+    <title>TradeGuard AI — Login</title>
     <style>
         body { background: #0d1117; color: #e6edf3; font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .box { background: #161b22; padding: 40px; border-radius: 12px; border: 1px solid #30363d; width: 320px; }
@@ -176,7 +176,7 @@ LOGIN_PAGE = """
 </head>
 <body>
     <div class="box">
-        <h1>🤖 Robo-Shopper</h1>
+        <h1>🤖 TradeGuard AI</h1>
         <p>Operator Login</p>
         <form id="loginForm">
             <input type="password" id="password" placeholder="Enter operator password" autofocus>
@@ -226,7 +226,7 @@ DASHBOARD_PAGE = """
     <meta charset=utf-8>
     <meta name=viewport content="width=device-width,initial-scale=1">
     <meta name="csrf-token" content="{{CSRF_TOKEN}}">
-    <title>Robo-Shopper V4</title>
+    <title>TradeGuard AI</title>
     <style>
         body{background:#0d1117;color:#e6edf3;font-family:ui-monospace,monospace;margin:0;padding:24px}
         h1{color:#00c2ff}
@@ -242,7 +242,7 @@ DASHBOARD_PAGE = """
     </style>
 </head>
 <body>
-    <h1>🤖 Robo-Shopper V4 <span class="logout" onclick="logout()">Logout</span></h1>
+    <h1>🤖 TradeGuard AI <span class="logout" onclick="logout()">Logout</span></h1>
     <div class=grid id=cards></div>
     <h2>Pending Approvals</h2>
     <table><thead><tr><th>ID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Entry</th><th>Stop</th><th>Action</th></tr></thead>

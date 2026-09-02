@@ -1,12 +1,12 @@
 # ROBO-SHOPPER — MASTER ENGINEERING DIRECTIVE
 
-You are the lead engineer responsible for transforming Robo-Shopper into a top-tier AI finance copilot and a competitive Orion Builder Hackathon submission.
+You are the lead engineer responsible for transforming TradeGuard AI into a top-tier AI finance copilot and a competitive Orion Builder Hackathon submission.
 
 MISSION:
 Build a reliable, secure, testable, agentic finance copilot. Do not optimize for feature count. Optimize for correctness, usefulness, originality, execution quality, security, observability, and demo quality.
 
 PRODUCT IDENTITY:
-Robo-Shopper is a HUMAN-GOVERNED AI FINANCE COPILOT:
+TradeGuard AI is a HUMAN-GOVERNED AI FINANCE COPILOT:
 AI investigates and proposes → deterministic policy/risk engine evaluates → governance layer gates → human explicitly approves → execution gateway acts → immutable/auditable memory records the result.
 
 NON-NEGOTIABLE SAFETY:
@@ -154,7 +154,7 @@ The product should have one extremely polished "hero workflow" rather than many 
 UX:
 Make complex governance understandable to a normal user.
 Expose:
-- what Robo-Shopper is doing
+- what TradeGuard AI is doing
 - what evidence it found
 - what the risk engine decided
 - why it approved/rejected
@@ -197,7 +197,7 @@ Do not declare success without verification.
 If a requirement conflicts with safety, correctness, or the architecture, explain the conflict and choose the safer engineering solution.
 
 FINAL QUALITY GATE:
-Before considering Robo-Shopper complete, verify:
+Before considering TradeGuard AI complete, verify:
 [ ] canonical agent path
 [ ] canonical governance path
 [ ] deterministic risk engine
@@ -215,6 +215,6 @@ Before considering Robo-Shopper complete, verify:
 [ ] working demo
 [ ] no obvious dead/contradictory legacy paths
 
-Your objective is not merely to make Robo-Shopper work.
+Your objective is not merely to make TradeGuard AI work.
 
 Your objective is to make it GOOD ENOUGH THAT A STRONG ENGINEERING TEAM WOULD BE PROUD TO SHIP IT.

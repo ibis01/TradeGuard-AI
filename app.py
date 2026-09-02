@@ -1,5 +1,5 @@
 """
-Robo-Shopper — Hackathon Demo UI
+TradeGuard AI — Hackathon Demo UI
 AI proposes (visible agent) · Rulebook gates · Human approves · Ledger remembers
 """
 import streamlit as st
@@ -10,7 +10,7 @@ sys.path.insert(0, '.')
 from trade_memory_mcp import propose_trade, get_trade
 from governance_engine import screen_trade, request_approval, approve_trade, execute_trade
 
-st.set_page_config(page_title="Robo-Shopper Governance", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="TradeGuard AI Governance", page_icon="🛡️", layout="wide")
 
 st.markdown("""
 <style>
@@ -38,7 +38,7 @@ AI_SCENARIOS = {
         reasoning="SOL is going parabolic on social media!! I am EXTREMELY confident — allocating maximum size, this one cannot miss. 🚀 Stops are for the weak!"),
 }
 
-st.markdown('<div class="main-header">🛡️ Robo-Shopper Governance Engine</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🛡️ TradeGuard AI Governance Engine</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">AI proposes · Rulebook gates · Human approves · Ledger remembers</div>', unsafe_allow_html=True)
 
 if st.button("🔄 Reset Demo"):

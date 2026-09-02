@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - Concurrency Tests (Sprint 5).
+TradeGuard AI - Concurrency Tests (Sprint 5).
 Proves atomic transactions prevent race conditions.
 """
 import pytest

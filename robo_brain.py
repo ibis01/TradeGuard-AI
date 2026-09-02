@@ -53,7 +53,7 @@ def propose_trade(contract, side, amount):
 
 TOOLS = {"get_option_expiries": get_option_expiries, "propose_trade": propose_trade}
 
-SYSTEM_PROMPT = """You are Robo-Shopper, a crypto options assistant.
+SYSTEM_PROMPT = """You are TradeGuard AI, a crypto options assistant.
 Tools available: get_option_expiries, propose_trade.
 
 RULES:
@@ -67,7 +67,7 @@ messages = [
     {"role": "user", "content": "Hey Robo! Buy $750 worth of the Sept 27 options."},
 ]
 
-print("🧠 Robo-Shopper is waking up...")
+print("🧠 TradeGuard AI is waking up...")
 
 for step in range(6):
     resp = client.chat.completions.create(model=MODEL, messages=messages, temperature=0.0)
@@ -90,5 +90,5 @@ for step in range(6):
         messages.append({"role": "user", "content": f"Here is the result for {name}: {result}"})
     else:
         messages.append({"role": "assistant", "content": reply})
-        print("\n🤖 Robo-Shopper final answer:\n", reply)
+        print("\n🤖 TradeGuard AI final answer:\n", reply)
         break

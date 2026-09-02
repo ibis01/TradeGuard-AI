@@ -1,5 +1,5 @@
 """
-Robo-Shopper V4 - Portfolio Guardrails (Sprint 5).
+TradeGuard AI - Portfolio Guardrails (Sprint 5).
 Enforces circuit breakers, exposure limits, and correlation checks.
 USES THE SAME SOURCE OF TRUTH for portfolio balance as the risk engine.
 """
@@ -21,16 +21,18 @@ def _get_open_positions() -> List[Dict[str, Any]]:
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
+        # FIX: Changed 'position_size' to 'quantity' to match the actual database schema
         cursor.execute("""
-            SELECT symbol, side, entry_price, position_size 
+            SELECT symbol, side, entry_price, quantity 
             FROM trades 
             WHERE status NOT IN ('closed', 'rejected', 'proposed')
         """)
         rows = cursor.fetchall()
         conn.close()
         return [{"symbol": r[0], "side": r[1], "entry": r[2], "size": r[3]} for r in rows]
-    except:
-        return []
+    except sqlite3.Error as e:
+        # Fail-closed: raise exception to prevent silent exposure bypass
+        raise RuntimeError(f"Cannot retrieve open positions: {e}")
 
 def check_circuit_breaker() -> Dict[str, Any]:
     """
@@ -77,7 +79,7 @@ def check_exposure_limit(proposed_size: float, proposed_entry: float) -> Dict[st
     """
     try:
         balance = _get_real_portfolio_balance()
-        open_positions = _get_open_positions()
+        open_positions = _get_open_positions()  # May raise RuntimeError
         
         # Calculate current exposure in USD
         current_exposure = sum([p["size"] * p["entry"] for p in open_positions])
@@ -102,20 +104,12 @@ def check_exposure_limit(proposed_size: float, proposed_entry: float) -> Dict[st
             "total_exposure_usd": round(total_exposure, 2),
             "portfolio_balance": balance
         }
+    except RuntimeError as e:
+        # Fail-closed: exposure check cannot proceed
+        return {"status": "REJECTED", "reason": f"Exposure check failed: {e}"}
     except Exception as e:
-        return {"status": "ERROR", "reason": f"Cannot check exposure: {e}"}
+        return {"status": "REJECTED", "reason": f"Cannot check exposure: {e}"}
 
-def check_circuit_breaker() -> Dict[str, Any]:
-    try:
-        balance = _get_real_portfolio_balance()
-        # ... check logic
-    except Exception as e:
-        return {
-            "status": "ERROR",
-            "reason": f"Circuit breaker unavailable: {e}",
-            "recommendation": "HARD STOP - no trades until resolved."
-        }
-        
 def check_correlation_risk(proposed_symbol: str) -> Dict[str, Any]:
     """
     Warns if trying to open a correlated position (e.g., BTC and ETH).
@@ -123,14 +117,18 @@ def check_correlation_risk(proposed_symbol: str) -> Dict[str, Any]:
     if proposed_symbol not in CORE_ASSETS:
         return {"status": "PASSED", "reason": "Asset not in core correlation set."}
     
-    open_positions = _get_open_positions()
-    open_symbols = [p["symbol"] for p in open_positions]
-    
-    # If we already have BTC open and propose ETH, flag it.
-    for asset in CORE_ASSETS:
-        if asset != proposed_symbol and asset in open_symbols:
-            return {
-                "status": "WARNING",
-                "reason": f"Correlated asset {asset} is already open. Adding {proposed_symbol} increases correlated risk."
-            }
-    return {"status": "PASSED", "reason": "No correlation conflicts detected."}
+    try:
+        open_positions = _get_open_positions()  # May raise RuntimeError
+        open_symbols = [p["symbol"] for p in open_positions]
+        
+        # If we already have BTC open and propose ETH, flag it.
+        for asset in CORE_ASSETS:
+            if asset != proposed_symbol and asset in open_symbols:
+                return {
+                    "status": "WARNING",
+                    "reason": f"Correlated asset {asset} is already open. Adding {proposed_symbol} increases correlated risk."
+                }
+        return {"status": "PASSED", "reason": "No correlation conflicts detected."}
+    except RuntimeError as e:
+        # Fail-closed: cannot verify correlation without position data
+        return {"status": "REJECTED", "reason": f"Correlation check failed: {e}"}

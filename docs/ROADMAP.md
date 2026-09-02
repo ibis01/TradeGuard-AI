@@ -1,8 +1,8 @@
-# Robo-Shopper — Governed AI Finance Copilot
+# TradeGuard AI — Governed AI Finance Copilot
 
 **Agent proposes → rulebook gates → human approves → ledger remembers.**
 
-Robo-Shopper is a human-governed trading copilot built on the Model Context
+TradeGuard AI is a human-governed trading copilot built on the Model Context
 Protocol (MCP). It fuses market intelligence (spot, options, prediction
 markets, news sentiment) with a deterministic risk engine and persistent
 trade memory — and it **never moves user funds without explicit human approval**.
@@ -11,7 +11,7 @@ trade memory — and it **never moves user funds without explicit human approval
 
 ## Safety model (read first)
 
-Robo-Shopper follows **Model A: human-governed copilot**.
+TradeGuard AI follows **Model A: human-governed copilot**.
 
 - Execution is emitted as CLI strings with `dry_run: true` and
   `PENDING_HUMAN_APPROVAL`. The agent never holds user keys.
@@ -42,7 +42,7 @@ y
 ## Quickstart
 
 ```bash
-git clone https://github.com/ibis01/robo-shopper && cd robo-shopper
+git clone https://github.com/ibis01/tradeguard-ai && cd tradeguard-ai
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env   # add keys as needed
