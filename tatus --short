@@ -1,0 +1,83 @@
+[1mdiff --git a/tests/test_governance_bypass.py b/tests/test_governance_bypass.py[m
+[1mindex cd9bd56..cc7535c 100644[m
+[1m--- a/tests/test_governance_bypass.py[m
+[1m+++ b/tests/test_governance_bypass.py[m
+[36m@@ -1,19 +1,47 @@[m
+ """Test that request_approval() cannot bypass risk screening."""[m
+ import pytest[m
+ from governance_engine import request_approval, screen_trade[m
+[31m-from tests.test_security import create_proposed_trade, clean_db[m
+[32m+[m[32mfrom trade_memory_mcp import propose_trade, get_trade[m
+ from schemas import TradeStatus[m
+[31m-from trade_memory_mcp import get_trade[m
+[32m+[m
+[32m+[m[32m# Use the same fixture as other tests[m
+[32m+[m[32m@pytest.fixture[m
+[32m+[m[32mdef clean_db():[m
+[32m+[m[32m    import sqlite3[m
+[32m+[m[32m    from config import DB_PATH[m
+[32m+[m[32m    conn = sqlite3.connect(DB_PATH)[m
+[32m+[m[32m    cursor = conn.cursor()[m
+[32m+[m[32m    cursor.execute("DELETE FROM trades")[m
+[32m+[m[32m    cursor.execute("DELETE FROM approval_tokens")[m
+[32m+[m[32m    conn.commit()[m
+[32m+[m[32m    conn.close()[m
+[32m+[m[32m    yield[m
+[32m+[m[32m    conn = sqlite3.connect(DB_PATH)[m
+[32m+[m[32m    cursor = conn.cursor()[m
+[32m+[m[32m    cursor.execute("DELETE FROM trades")[m
+[32m+[m[32m    cursor.execute("DELETE FROM approval_tokens")[m
+[32m+[m[32m    conn.commit()[m
+[32m+[m[32m    conn.close()[m
+[32m+[m
+[32m+[m[32m# Helper to create a proposed trade (copied from test_security)[m
+[32m+[m[32mdef create_proposed_trade(symbol="BTC", side="long", quantity=0.01, entry=60000, stop=59500, reasoning="test"):[m
+[32m+[m[32m    prop = propose_trade(symbol, side, quantity, entry, stop, reasoning=reasoning)[m
+[32m+[m[32m    import sqlite3[m
+[32m+[m[32m    from config import DB_PATH[m
+[32m+[m[32m    conn = sqlite3.connect(DB_PATH)[m
+[32m+[m[32m    conn.execute([m
+[32m+[m[32m        "UPDATE trades SET portfolio_balance = 10000.0 WHERE id = ?",[m
+[32m+[m[32m        (prop["trade_id"],)[m
+[32m+[m[32m    )[m
+[32m+[m[32m    conn.commit()[m
+[32m+[m[32m    conn.close()[m
+[32m+[m[32m    return prop["trade_id"][m
+ [m
+ def test_request_approval_rejects_unscreened_trade(clean_db):[m
+     """request_approval() must reject trades that haven't been screened."""[m
+     tid = create_proposed_trade()[m
+[31m-    [m
+[31m-    # Trade is PROPOSED (not yet screened)[m
+     trade = get_trade(tid)[m
+     assert trade["status"] == TradeStatus.PROPOSED.value[m
+[31m-    [m
+[31m-    # request_approval should REJECT because trade hasn't been screened[m
+     result = request_approval(tid)[m
+     assert result["status"] == "REJECTED"[m
+     assert "screen_trade" in result["reason"].lower() or "awaiting_approval" in result["reason"].lower()[m
+[36m@@ -21,22 +49,12 @@[m [mdef test_request_approval_rejects_unscreened_trade(clean_db):[m
+ def test_request_approval_works_after_screening(clean_db):[m
+     """request_approval() works after screen_trade() passes."""[m
+     tid = create_proposed_trade()[m
+[31m-    [m
+[31m-    # Screen the trade (runs risk/exposure/breaker checks)[m
+     screen_result = screen_trade(tid)[m
+[31m-    [m
+[31m-    # Debug: if screening fails, show why[m
+     if screen_result.get("status") != "SUCCESS":[m
+         print(f"Screen failed: {screen_result}")[m
+[31m-    [m
+     assert screen_result["status"] == "SUCCESS", f"Screening failed: {screen_result}"[m
+[31m-    [m
+[31m-    # Now trade should be AWAITING_APPROVAL[m
+     trade = get_trade(tid)[m
+     assert trade["status"] == TradeStatus.AWAITING_APPROVAL.value[m
+[31m-    [m
+[31m-    # request_approval should now succeed[m
+     result = request_approval(tid)[m
+     assert result["status"] == "success"[m
+[31m-    assert "approval_token" in result[m
+[31m-[m
+[32m+[m[32m    assert "approval_token" in result[m
+\ No newline at end of file[m
