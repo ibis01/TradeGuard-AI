@@ -1,5 +1,5 @@
 """
-TradeGuard AI - Portfolio Guardrails (Sprint 5).
+TradeGuard AI - Portfolio Guardrails.
 Enforces circuit breakers, exposure limits, and correlation checks.
 USES THE SAME SOURCE OF TRUTH for portfolio balance as the risk engine.
 """
@@ -7,7 +7,9 @@ import os
 import sqlite3
 from typing import Dict, Any, List, Optional
 
-# --- IMPORT THE REAL BALANCE FETCHER (NO MOCKS) ---
+# --- IMPORT CANONICAL CONFIG AND SCHEMAS ---
+from config import DB_PATH
+from schemas import TradeStatus
 from risk_management_mcp import _get_real_portfolio_balance
 
 # Constants (using DECIMAL convention: 0.02 = 2%)
@@ -17,21 +19,21 @@ CORE_ASSETS = ["BTC", "ETH", "SOL"]
 
 def _get_open_positions() -> List[Dict[str, Any]]:
     """Fetches currently open positions from the trades ledger."""
-    db_path = os.path.join(os.path.dirname(__file__), "data", "trades.db")
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        # FIX: Changed 'position_size' to 'quantity' to match the actual database schema
+        # FIX: Use canonical DB_PATH, correct column name (quantity), 
+        # and only include truly open/approved statuses.
         cursor.execute("""
             SELECT symbol, side, entry_price, quantity 
             FROM trades 
-            WHERE status NOT IN ('closed', 'rejected', 'proposed')
-        """)
+            WHERE status IN (?, ?)
+        """, (TradeStatus.APPROVED.value, TradeStatus.EXECUTED.value))
         rows = cursor.fetchall()
         conn.close()
         return [{"symbol": r[0], "side": r[1], "entry": r[2], "size": r[3]} for r in rows]
     except sqlite3.Error as e:
-        # Fail-closed: raise exception to prevent silent exposure bypass
+        # FIX: FAIL-CLOSED. Raise exception to prevent silent exposure bypass.
         raise RuntimeError(f"Cannot retrieve open positions: {e}")
 
 def check_circuit_breaker() -> Dict[str, Any]:
@@ -41,16 +43,14 @@ def check_circuit_breaker() -> Dict[str, Any]:
     """
     try:
         balance = _get_real_portfolio_balance()
-        db_path = os.path.join(os.path.dirname(__file__), "data", "trades.db")
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        # Get today's P&L
         cursor.execute("""
             SELECT COALESCE(SUM(pnl), 0) 
             FROM trades 
-            WHERE status='closed' AND date(closed_at) = date('now')
-        """)
+            WHERE status = ? AND date(closed_at) = date('now')
+        """, (TradeStatus.CLOSED.value,))
         daily_pnl = cursor.fetchone()[0] or 0.0
         conn.close()
         
@@ -79,9 +79,8 @@ def check_exposure_limit(proposed_size: float, proposed_entry: float) -> Dict[st
     """
     try:
         balance = _get_real_portfolio_balance()
-        open_positions = _get_open_positions()  # May raise RuntimeError
+        open_positions = _get_open_positions()  # May raise RuntimeError (fail-closed)
         
-        # Calculate current exposure in USD
         current_exposure = sum([p["size"] * p["entry"] for p in open_positions])
         proposed_exposure = proposed_size * proposed_entry
         total_exposure = current_exposure + proposed_exposure
@@ -105,7 +104,7 @@ def check_exposure_limit(proposed_size: float, proposed_entry: float) -> Dict[st
             "portfolio_balance": balance
         }
     except RuntimeError as e:
-        # Fail-closed: exposure check cannot proceed
+        # FIX: FAIL-CLOSED on database errors
         return {"status": "REJECTED", "reason": f"Exposure check failed: {e}"}
     except Exception as e:
         return {"status": "REJECTED", "reason": f"Cannot check exposure: {e}"}
@@ -121,7 +120,6 @@ def check_correlation_risk(proposed_symbol: str) -> Dict[str, Any]:
         open_positions = _get_open_positions()  # May raise RuntimeError
         open_symbols = [p["symbol"] for p in open_positions]
         
-        # If we already have BTC open and propose ETH, flag it.
         for asset in CORE_ASSETS:
             if asset != proposed_symbol and asset in open_symbols:
                 return {
@@ -130,5 +128,5 @@ def check_correlation_risk(proposed_symbol: str) -> Dict[str, Any]:
                 }
         return {"status": "PASSED", "reason": "No correlation conflicts detected."}
     except RuntimeError as e:
-        # Fail-closed: cannot verify correlation without position data
-        return {"status": "REJECTED", "reason": f"Correlation check failed: {e}"}          
+        # FIX: FAIL-CLOSED on database errors
+        return {"status": "REJECTED", "reason": f"Correlation check failed: {e}"}
