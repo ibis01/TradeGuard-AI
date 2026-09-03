@@ -196,7 +196,7 @@ if __name__ == "__main__":
     if not check_server():
         print("\n❌ Dashboard server is not running!")
         print("   Start it in another terminal:")
-        print("   cd ~/robo-shopper && export DEV_MODE=1 && python dashboard.py\n")
+        print("   cd ~/tradeguard-ai && export DEV_MODE=1 && python dashboard.py\n")
         sys.exit(1)
 
     s = requests.Session()

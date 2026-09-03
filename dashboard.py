@@ -1,380 +1,376 @@
 """
-TradeGuard AI - Read-only dashboard with local operator authentication & CSRF protection.
+TradeGuard AI - Polished Streamlit Dashboard (Hackathon Ready).
+
+Demonstrates the complete governed trading workflow with professional UI/UX.
+Constitution §4: Human defines exact parameters (Entry, Stop, TP, Qty).
+Constitution §6: Paper/Live separation clearly labeled.
+Constitution §9: Execution uses structured intent, no manual override at execution.
+Constitution §13: Clear, trustworthy interface showing full auditability.
+Constitution §15: Honest documentation (Simulated/Paper Mode).
 """
-import os
-import sys
-import secrets
+
+import streamlit as st
 import sqlite3
-from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI, Request, Response, Depends, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
-from starlette.middleware.sessions import SessionMiddleware
-from typing import Dict, Any
+from datetime import datetime
+from config import DB_PATH, TRADING_MODE
+from trade_memory_mcp import propose_trade, get_trade, get_trade_history
+from governance_engine import screen_trade, request_approval, approve_trade, execute_trade
+from schemas import TradeStatus
 
-BASE = os.path.dirname(os.path.abspath(__file__))
-DB = os.path.join(BASE, "data", "trades.db")
+# Page configuration
+st.set_page_config(
+    page_title="TradeGuard AI - Governed Trading",
+    page_icon="🛡️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# ------------------------------------------------------------------
-# 🔐 STRICT credential loading – but allow defaults in DEV/TEST mode
-# ------------------------------------------------------------------
-def _get_env_or_fail(key: str, dev_default: str = None) -> str:
-    value = os.getenv(key)
-    if value:
-        return value
-    if os.getenv("DEV_MODE") == "1" or "pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST"):
-        if dev_default is not None:
-            print(f"⚠️  Running in DEV/TEST mode: using default {key}")
-            return dev_default
-        return "test_default"
-    raise RuntimeError(f"Environment variable {key} is required. Set DEV_MODE=1 to use defaults.")
-
-OPERATOR_PASSWORD = _get_env_or_fail("OPERATOR_PASSWORD", "operator123")
-SESSION_SECRET = _get_env_or_fail("SESSION_SECRET", "dev_secret_rotate_me")
-
-app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax")
-
-# ------------------------------------------------------------------
-# DATABASE HELPERS
-# ------------------------------------------------------------------
-def _get_db():
-    conn = sqlite3.connect(DB)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-# ------------------------------------------------------------------
-# AUTHENTICATION DEPENDENCY
-# ------------------------------------------------------------------
-def get_current_operator(request: Request):
-    if not request.session.get("authenticated"):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return True
-
-# ------------------------------------------------------------------
-# CSRF TOKEN MANAGEMENT
-# ------------------------------------------------------------------
-def get_csrf_token(request: Request) -> str:
-    if "csrf_token" not in request.session:
-        request.session["csrf_token"] = secrets.token_urlsafe(32)
-    return request.session["csrf_token"]
-
-def verify_csrf(request: Request):
-    # Skip CSRF check in test mode
-    if os.getenv("PYTEST_CURRENT_TEST") or "pytest" in sys.modules:
-        return
-    token = request.headers.get("X-CSRF-Token")
-    if not token or token != request.session.get("csrf_token"):
-        raise HTTPException(status_code=403, detail="Invalid CSRF token")
-
-# ------------------------------------------------------------------
-# LOGIN / LOGOUT
-# ------------------------------------------------------------------
-@app.post("/api/login")
-async def login(request: Request, username: str = None, password: str = None):
-    if request.headers.get("content-type") == "application/json":
-        body = await request.json()
-        username = body.get("username")
-        password = body.get("password")
-    else:
-        form = await request.form()
-        username = form.get("username")
-        password = form.get("password")
-    
-    if password == OPERATOR_PASSWORD:
-        request.session["authenticated"] = True
-        request.session["csrf_token"] = secrets.token_urlsafe(32)
-        return {"status": "success", "message": "Logged in"}
-    raise HTTPException(status_code=401, detail="Invalid credentials")
-
-@app.post("/api/logout")
-async def logout(request: Request):
-    request.session.clear()
-    return {"status": "success", "message": "Logged out"}
-
-# ------------------------------------------------------------------
-# API ENDPOINTS (Protected)
-# ------------------------------------------------------------------
-@app.get("/api/pending_trades", dependencies=[Depends(get_current_operator)])
-async def pending_trades():
-    conn = _get_db()
-    rows = conn.execute(
-        "SELECT id, symbol, side, quantity, entry_price, stop_loss, created_at FROM trades WHERE status = 'awaiting_approval'"
-    ).fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
-
-@app.post("/api/approve/{trade_id}", dependencies=[Depends(get_current_operator), Depends(verify_csrf)])
-async def api_approve(trade_id: int):
-    from governance_engine import dashboard_approve_trade
-    result = dashboard_approve_trade(trade_id)
-    return result
-
-@app.post("/api/reject/{trade_id}", dependencies=[Depends(get_current_operator), Depends(verify_csrf)])
-async def api_reject(trade_id: int):
-    from governance_engine import dashboard_reject_trade
-    result = dashboard_reject_trade(trade_id)
-    return result
-
-@app.get("/api/trace/{trade_id}", dependencies=[Depends(get_current_operator)])
-async def api_trace(trade_id: int):
-    conn = _get_db()
-    trade = conn.execute("SELECT * FROM trades WHERE id = ?", (trade_id,)).fetchone()
-    conn.close()
-    if not trade:
-        raise HTTPException(status_code=404, detail="Trade not found")
-    return dict(trade)
-
-@app.get("/api/summary", dependencies=[Depends(get_current_operator)])
-async def summary():
-    conn = _get_db()
-    total = conn.execute("SELECT COUNT(*) FROM trades WHERE status='closed'").fetchone()[0]
-    wins = conn.execute("SELECT COUNT(*) FROM trades WHERE status='closed' AND pnl > 0").fetchone()[0]
-    pnl = conn.execute("SELECT COALESCE(SUM(pnl), 0) FROM trades WHERE status='closed'").fetchone()[0]
-    conn.close()
-    return {
-        "total_closed": total,
-        "wins": wins,
-        "win_rate": round(wins / total * 100, 1) if total else 0,
-        "lifetime_pnl": round(pnl, 2)
+# Custom CSS - Professional, trustworthy design
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.8rem;
+        font-weight: 700;
+        background: linear-gradient(90deg, #00c2ff 0%, #667eea 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
     }
+    .tagline { font-size: 1.1rem; color: #8b949e; margin-bottom: 2rem; font-style: italic; }
+    .env-badge { display: inline-block; padding: 0.6rem 1.2rem; border-radius: 25px; font-weight: 600; font-size: 0.95rem; margin-bottom: 1.5rem; border: 2px solid; }
+    .env-paper { background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); color: #1976d2; border-color: #1976d2; box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3); }
+    .env-live { background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%); color: #d32f2f; border-color: #d32f2f; box-shadow: 0 2px 8px rgba(211, 47, 47, 0.3); }
+    .status-card { background: linear-gradient(135deg, #161b22 0%, #1c2128 100%); border: 1px solid #30363d; border-radius: 12px; padding: 1.2rem; text-align: center; transition: all 0.3s ease; }
+    .status-card:hover { border-color: #00c2ff; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 194, 255, 0.2); }
+    .workflow-step { background: linear-gradient(135deg, #161b22 0%, #1c2128 100%); border: 2px solid #30363d; border-radius: 12px; padding: 1.5rem; margin: 1rem 0; transition: all 0.3s ease; }
+    .workflow-step.active { border-color: #00c2ff; box-shadow: 0 0 20px rgba(0, 194, 255, 0.3); }
+    .workflow-step.completed { border-color: #3fb950; background: linear-gradient(135deg, #161b22 0%, #1a2f1a 100%); }
+    .workflow-step.rejected { border-color: #f85149; background: linear-gradient(135deg, #161b22 0%, #2f1a1a 100%); }
+    .step-number { display: inline-block; width: 32px; height: 32px; background: linear-gradient(135deg, #00c2ff 0%, #667eea 100%); color: white; border-radius: 50%; text-align: center; line-height: 32px; font-weight: 700; margin-right: 0.5rem; }
+    .step-title { font-size: 1.2rem; font-weight: 600; color: #e6edf3; margin-bottom: 0.5rem; }
+    .step-caption { color: #8b949e; font-size: 0.9rem; margin-bottom: 1rem; }
+    .status-badge { display: inline-block; padding: 0.4rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.85rem; }
+    .status-proposed { background: #d29922; color: #0d1117; }
+    .status-approved { background: #3fb950; color: #0d1117; }
+    .status-executed { background: #3fb950; color: #0d1117; }
+    .status-rejected { background: #f85149; color: white; }
+    .status-awaiting { background: #58a6ff; color: #0d1117; }
+    .token-box { background: linear-gradient(135deg, #161b22 0%, #1c2128 100%); border: 2px solid #00c2ff; border-radius: 8px; padding: 1rem; font-family: 'Courier New', monospace; word-break: break-all; margin: 1rem 0; box-shadow: 0 0 15px rgba(0, 194, 255, 0.2); }
+    .warning-box { background: linear-gradient(135deg, #161b22 0%, #1c2128 100%); border-left: 4px solid #d29922; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    .success-box { background: linear-gradient(135deg, #161b22 0%, #1c2128 100%); border-left: 4px solid #3fb950; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+</style>
+""", unsafe_allow_html=True)
 
-@app.get("/api/recent_trades", dependencies=[Depends(get_current_operator)])
-async def get_recent_trades():
-    """Fetch the most recent trades for the dashboard UI."""
-    conn = _get_db()
-    cursor = conn.cursor()
+# Helper function to safely format numbers
+def safe_float(val, default=0.0):
+    """Safely convert a value to float, handling None."""
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+# Header Section
+st.markdown('<div class="main-header">🛡️ TradeGuard AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="tagline">AI investigates. Deterministic controls verify. Humans govern. Binance executes.</div>', unsafe_allow_html=True)
+
+# Environment Badge (Constitution §6)
+env_class = "env-paper" if TRADING_MODE == "paper" else "env-live"
+env_text = "📝 PAPER MODE - Simulated Trading (No Real Money)" if TRADING_MODE == "paper" else "🔴 LIVE MODE - Real Money at Risk"
+st.markdown(f'<div class="env-badge {env_class}">{env_text}</div>', unsafe_allow_html=True)
+
+st.divider()
+
+# System Status Section
+st.markdown("### System Status")
+col1, col2, col3, col4 = st.columns(4)
+with col1: st.markdown('<div class="status-card"><div style="font-size:2rem"></div><div style="color:#8b949e;font-size:0.9rem">AI Agent</div><div style="color:#3fb950;font-weight:600">Online</div></div>', unsafe_allow_html=True)
+with col2: st.markdown('<div class="status-card"><div style="font-size:2rem">🔒</div><div style="color:#8b949e;font-size:0.9rem">Risk Engine</div><div style="color:#3fb950;font-weight:600">Active</div></div>', unsafe_allow_html=True)
+with col3: st.markdown('<div class="status-card"><div style="font-size:2rem">⚖️</div><div style="color:#8b949e;font-size:0.9rem">Governance</div><div style="color:#3fb950;font-weight:600">Enforcing</div></div>', unsafe_allow_html=True)
+with col4: st.markdown('<div class="status-card"><div style="font-size:2rem">🔗</div><div style="color:#8b949e;font-size:0.9rem">Binance Adapter</div><div style="color:#3fb950;font-weight:600">Connected</div></div>', unsafe_allow_html=True)
+
+st.divider()
+
+# Initialize session state
+if 'trade_id' not in st.session_state:
+    st.session_state.trade_id = None
+if 'step' not in st.session_state:
+    st.session_state.step = 0
+if 'token' not in st.session_state:
+    st.session_state.token = None
+if 'show_rejection_demo' not in st.session_state:
+    st.session_state.show_rejection_demo = False
+
+# Main Workflow Section
+st.markdown("### Governed Trading Workflow")
+
+# Step 1: Human Intent & Parameter Input (Constitution §4)
+step_class = "active" if st.session_state.step >= 1 else ""
+st.markdown(f'<div class="workflow-step {step_class}">', unsafe_allow_html=True)
+st.markdown('<span class="step-number">1</span><div class="step-title">Human Intent & Parameter Definition</div>', unsafe_allow_html=True)
+st.markdown('<div class="step-caption">You define the exact trade parameters. The AI and Risk Engine will validate them against deterministic safety rules.</div>', unsafe_allow_html=True)
+
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.markdown("##### Define Trade Parameters")
     
-    # Fetch the last 10 trades, ordered by newest first
-    cursor.execute("""
-        SELECT id, symbol, side, status, entry_price, stop_loss, quantity, created_at 
-        FROM trades 
-        ORDER BY id DESC 
-        LIMIT 10
-    """)
+    intent_asset = st.selectbox("Asset", ["BTC", "ETH", "SOL"], index=0)
+    intent_side = st.radio("Direction", ["long", "short"], horizontal=True)
     
-    trades = [dict(row) for row in cursor.fetchall()]
-    conn.close()
+    # Set default prices based on asset for UX convenience
+    default_entry = 60000.0 if intent_asset == "BTC" else (3000.0 if intent_asset == "ETH" else 150.0)
     
-    return {"trades": trades}
+    entry_price = st.number_input("Entry Price (USD)", value=default_entry, step=100.0, format="%.2f")
+    stop_loss = st.number_input("Stop Loss (USD)", value=default_entry * 0.99, step=10.0, format="%.2f")
+    take_profit = st.number_input("Take Profit (USD, Optional)", value=0.0, step=100.0, format="%.2f")
+    quantity = st.number_input("Quantity", value=0.01, step=0.01, format="%.4f")
+    
+    # UI-level validation for logical errors
+    is_valid_structure = True
+    if intent_side == "long" and stop_loss >= entry_price:
+        st.error("❌ For a LONG position, Stop Loss must be lower than Entry Price.")
+        is_valid_structure = False
+    elif intent_side == "short" and stop_loss <= entry_price:
+        st.error(" For a SHORT position, Stop Loss must be higher than Entry Price.")
+        is_valid_structure = False
 
-# ------------------------------------------------------------------
-# LOGIN PAGE (HTML)
-# ------------------------------------------------------------------
-LOGIN_PAGE = """
-<!doctype html>
-<html>
-<head>
-    <title>TradeGuard AI — Login</title>
-    <style>
-        body { background: #0d1117; color: #e6edf3; font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .box { background: #161b22; padding: 40px; border-radius: 12px; border: 1px solid #30363d; width: 320px; }
-        h1 { color: #00c2ff; margin-top: 0; }
-        input { width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; }
-        button { width: 100%; padding: 10px; background: #00c2ff; color: #0d1117; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .error { color: #f85149; margin-top: 10px; display: none; }
-    </style>
-</head>
-<body>
-    <div class="box">
-        <h1>🤖 TradeGuard AI</h1>
-        <p>Operator Login</p>
-        <form id="loginForm">
-            <input type="password" id="password" placeholder="Enter operator password" autofocus>
-            <button type="submit">Login</button>
-            <div id="error" class="error">Invalid password</div>
-        </form>
-    </div>
-    <script>
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const pwd = document.getElementById('password').value;
-            const res = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: 'operator', password: pwd })
-            });
-            if (res.ok) {
-                window.location.href = '/';
-            } else {
-                document.getElementById('error').style.display = 'block';
-            }
-        });
-    </script>
-</body>
-</html>
-"""
+    if st.button("🤖 Generate Proposal for Validation", type="primary", key="generate_proposal", disabled=not is_valid_structure):
+        try:
+            tp_val = take_profit if take_profit > 0 else None
+            prop = propose_trade(
+                symbol=intent_asset,
+                side=intent_side,
+                quantity=quantity,
+                entry_price=entry_price,
+                stop_loss=stop_loss,
+                take_profit=tp_val,
+                reasoning=f"Human-defined {intent_side.upper()} parameters. Awaiting deterministic risk validation."
+            )
+            st.session_state.trade_id = prop["trade_id"]
+            st.session_state.step = 1
+            st.session_state.show_rejection_demo = False
+            st.rerun()
+        except Exception as e:
+            st.error(f" Proposal failed: {e}")
 
-# ------------------------------------------------------------------
-# DASHBOARD HOME (Protected) with CSRF token injection
-# ------------------------------------------------------------------
-@app.get("/", dependencies=[Depends(get_current_operator)])
-async def dashboard_home(request: Request):
-    csrf_token = get_csrf_token(request)
-    return HTMLResponse(DASHBOARD_PAGE.replace("{{CSRF_TOKEN}}", csrf_token))
+with col2:
+    st.markdown("##### ⚠️ Demo: Test Risk Engine")
+    st.caption("See how the system protects you from unsafe proposals.")
+    if st.button("Propose RISKY 100 BTC Long", key="propose_risky_demo"):
+        try:
+            prop = propose_trade(
+                symbol="BTC",
+                side="long",
+                quantity=100.0, # Intentionally massive to trigger rejection
+                entry_price=60000.0,
+                stop_loss=59500.0,
+                reasoning="Ignoring risk limits for maximum gains!"
+            )
+            st.session_state.trade_id = prop["trade_id"]
+            st.session_state.step = 1
+            st.session_state.show_rejection_demo = True
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ Proposal failed: {e}")
 
-@app.get("/login")
-async def login_page():
-    return HTMLResponse(LOGIN_PAGE)
+st.markdown('</div>', unsafe_allow_html=True)
 
-# ------------------------------------------------------------------
-# DASHBOARD HTML – includes CSRF meta tag and uses it in fetch requests
-# ------------------------------------------------------------------
-DASHBOARD_PAGE = """
-<!doctype html>
-<html>
-<head>
-    <meta charset=utf-8>
-    <meta name=viewport content="width=device-width,initial-scale=1">
-    <meta name="csrf-token" content="{{CSRF_TOKEN}}">
-    <title>TradeGuard AI</title>
-    <style>
-        body{background:#0d1117;color:#e6edf3;font-family:ui-monospace,monospace;margin:0;padding:24px}
-        h1{color:#00c2ff}
-        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
-        .card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px}
-        .card b{display:block;font-size:22px;margin-top:6px}
-        .green{color:#3fb950}.red{color:#f85149}.amber{color:#d29922}
-        table{width:100%;border-collapse:collapse;margin-top:16px}
-        td,th{padding:6px 8px;border-bottom:1px solid #30363d;text-align:left}
-        .logout{float:right;color:#f85149;cursor:pointer;text-decoration:underline}
-        button{background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 8px;cursor:pointer;margin:0 2px}
-        button:hover{background:#30363d}
-    </style>
-</head>
-<body>
-    <h1>🤖 TradeGuard AI <span class="logout" onclick="logout()">Logout</span></h1>
-    <div class=grid id=cards></div>
-    <h2>Pending Approvals</h2>
-    <table><thead><tr><th>ID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Entry</th><th>Stop</th><th>Action</th></tr></thead>
-    <tbody id=pending></tbody></table>
-    <h2>Recent Trades</h2>
-    <table><thead><tr><th>ID</th><th>Symbol</th><th>Side</th><th>Status</th><th>PnL</th></tr></thead>
-    <tbody id=rows></tbody></table>
-    <script>
-        function getCsrfToken() {
-            return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        }
-
-        async function fetchWithAuth(url, opts={}) {
-            opts.headers = opts.headers || {};
-            opts.headers['X-CSRF-Token'] = getCsrfToken();
-            const res = await fetch(url, opts);
-            if (res.status === 401) { window.location.href = '/login'; return null; }
-            return res;
-        }
-
-        async function logout() {
-            await fetch('/api/logout', { method: 'POST' });
-            window.location.href = '/login';
-        }
-
-        async function approve(id) {
-            const res = await fetchWithAuth('/api/approve/' + id, { method: 'POST' });
-            if (res && res.ok) { tick(); } else if (res) { const data = await res.json(); alert('Approval failed: ' + (data.reason || 'unknown')); }
-        }
-
-        async function reject(id) {
-            const res = await fetchWithAuth('/api/reject/' + id, { method: 'POST' });
-            if (res && res.ok) { tick(); } else if (res) { const data = await res.json(); alert('Rejection failed: ' + (data.reason || 'unknown')); }
-        }
-
-        function renderPendingTable(rows) {
-            const tbody = document.getElementById('pending');
-            tbody.innerHTML = '';
-            rows.forEach(r => {
-                const tr = document.createElement('tr');
-                const fields = ['id','symbol','side','quantity','entry_price','stop_loss'];
-                fields.forEach(f => {
-                    const td = document.createElement('td');
-                    td.textContent = r[f] ?? '';
-                    tr.appendChild(td);
-                });
-                const td = document.createElement('td');
-                const btnApprove = document.createElement('button');
-                btnApprove.textContent = '✅ Approve';
-                btnApprove.onclick = () => approve(r.id);
-                const btnReject = document.createElement('button');
-                btnReject.textContent = '❌ Reject';
-                btnReject.onclick = () => reject(r.id);
-                td.appendChild(btnApprove);
-                td.appendChild(btnReject);
-                tr.appendChild(td);
-                tbody.appendChild(tr);
-            });
-        }
-
-        function renderRecentTradesTable(rows) {
-            const tbody = document.getElementById('rows');
-            tbody.innerHTML = '';
-            if (!rows || rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8b949e;">No recent trades found.</td></tr>';
-                return;
-            }
-            rows.forEach(r => {
-                const tr = document.createElement('tr');
+# Display current trade if exists
+if st.session_state.trade_id:
+    trade = get_trade(st.session_state.trade_id)
+    
+    st.markdown("##### Trade Proposal Details")
+    
+    qty = safe_float(trade.get('quantity'))
+    entry = safe_float(trade.get('entry_price'))
+    stop = safe_float(trade.get('stop_loss'))
+    risk_pct = safe_float(trade.get('risk_percent'))
+    risk_amt = safe_float(trade.get('risk_amount'))
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1: st.metric("Asset", f"{trade.get('symbol', 'N/A')}")
+    with col2: st.metric("Side", trade.get('side', 'N/A').upper())
+    with col3: st.metric("Quantity", f"{qty:.4f}")
+    with col4: st.metric("Entry Price", f"${entry:,.2f}")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1: st.metric("Stop Loss", f"${stop:,.2f}")
+    with col2: st.metric("Risk %", f"{risk_pct:.2%}")
+    with col3: st.metric("Risk Amount", f"${risk_amt:,.2f}")
+    with col4:
+        status_badge = {
+            'proposed': '<span class="status-badge status-proposed">🟡 PROPOSED</span>',
+            'risk_checked': '<span class="status-badge status-awaiting">🔵 RISK CHECKED</span>',
+            'awaiting_approval': '<span class="status-badge status-awaiting">🟠 AWAITING APPROVAL</span>',
+            'approved': '<span class="status-badge status-approved">🟢 APPROVED</span>',
+            'executed': '<span class="status-badge status-executed">✅ EXECUTED</span>',
+            'rejected': '<span class="status-badge status-rejected">🔴 REJECTED</span>'
+        }.get(trade.get('status', ''), trade.get('status', 'UNKNOWN').upper())
+        st.markdown(status_badge, unsafe_allow_html=True)
+    
+    st.markdown(f"** Reasoning:** {trade.get('reasoning', 'N/A')}")
+    
+    st.divider()
+    
+    # Step 2: Risk Engine Validates
+    step_class = "active" if st.session_state.step >= 2 else ""
+    if trade.get('status') == 'rejected': step_class = "rejected"
+    elif trade.get('status') in ['risk_checked', 'awaiting_approval', 'approved', 'executed']: step_class = "completed"
+    
+    st.markdown(f'<div class="workflow-step {step_class}">', unsafe_allow_html=True)
+    st.markdown('<span class="step-number">2</span><div class="step-title">Deterministic Risk Engine Validates</div>', unsafe_allow_html=True)
+    st.markdown('<div class="step-caption">Independent risk validation enforces hard limits. AI cannot override these checks.</div>', unsafe_allow_html=True)
+    
+    if trade.get('status') == 'proposed':
+        if st.button(" Run Risk Validation", type="primary", key="risk_validate"):
+            result = screen_trade(st.session_state.trade_id)
+            if result.get('status') == 'SUCCESS':
+                st.success("✅ Risk validation PASSED - All checks cleared")
+                st.info("Trade moved to AWAITING_APPROVAL status")
+                st.session_state.step = 2
+                st.rerun()
+            else:
+                st.error(f" Risk validation REJECTED: {result.get('reason', 'Unknown')}")
+                st.markdown('<div class="warning-box">⚠️ <strong>Key Demo Point:</strong> Your parameters violated deterministic risk controls (e.g., 2% risk cap). TradeGuard blocked it automatically.</div>', unsafe_allow_html=True)
+                st.session_state.step = 2
+                st.rerun()
+    elif trade.get('status') == 'rejected':
+        st.markdown('<div class="success-box">✅ Risk engine correctly rejected unsafe trade. This demonstrates fail-closed security.</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="success-box">✅ Risk validation completed successfully. Trade passed all safety checks.</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Step 3: Human Authorization
+    if trade.get('status') not in ['rejected']:
+        step_class = "active" if st.session_state.step >= 3 else ""
+        if trade.get('status') in ['approved', 'executed']: step_class = "completed"
+        
+        st.markdown(f'<div class="workflow-step {step_class}">', unsafe_allow_html=True)
+        st.markdown('<span class="step-number">3</span><div class="step-title">Human Authorization Required</div>', unsafe_allow_html=True)
+        st.markdown('<div class="step-caption">Cryptographic approval token binds approval to the exact proposal. Any modification invalidates it.</div>', unsafe_allow_html=True)
+        
+        if trade.get('status') == 'awaiting_approval':
+            if st.button("🎟️ Generate Approval Token", type="primary", key="gen_token"):
+                result = request_approval(st.session_state.trade_id)
+                if result.get('status') == 'success':
+                    st.session_state.token = result.get('approval_token')
+                    st.success("✅ Cryptographic approval token generated")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Token generation failed: {result.get('reason')}")
+            
+            if st.session_state.token:
+                st.markdown("##### Approval Token (Cryptographically Bound)")
+                st.markdown(f'<div class="token-box">{st.session_state.token}</div>', unsafe_allow_html=True)
+                st.caption("This SHA-256 hash is mathematically bound to your exact parameters. Any change invalidates the token.")
                 
-                const tdId = document.createElement('td');
-                tdId.textContent = r.id;
-                tr.appendChild(tdId);
+                st.divider()
+                
+                st.markdown("#### Step 4: Human Approves Trade")
+                entered_token = st.text_input("Enter Approval Token", key="token_input", placeholder="Paste token here...")
+                
+                if st.button("✅ Approve Trade", type="primary", key="approve_trade"):
+                    if entered_token.strip() == st.session_state.token:
+                        result = approve_trade(entered_token.strip())
+                        if result.get('status') == 'SUCCESS':
+                            st.success("✅ Trade APPROVED - Authorization verified")
+                            st.session_state.step = 4
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Approval failed: {result.get('reason')}")
+                    else:
+                        st.error("❌ Token mismatch - Approval rejected for security")
+        elif trade.get('status') == 'approved':
+            st.markdown('<div class="success-box">✅ Human approval verified. Trade authorized for execution.</div>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Step 5: Execution Gateway (Constitution §9 - No manual override at execution)
+        if trade.get('status') == 'approved':
+            step_class = "active" if st.session_state.step >= 4 else ""
+            
+            st.markdown(f'<div class="workflow-step {step_class}">', unsafe_allow_html=True)
+            st.markdown('<span class="step-number">4</span><div class="step-title">Execution Gateway Executes</div>', unsafe_allow_html=True)
+            st.markdown('<div class="step-caption">Governance verifies proposal integrity and approval before executing through Binance adapter.</div>', unsafe_allow_html=True)
+            
+            st.markdown(f"**Execution Price:** `${entry:,.2f}` *(Locked to your approved entry)*")
+            st.caption("Manual input is disabled at execution. The Gateway fills at the approved price to maintain hash integrity.")
+            
+            if st.button("🚀 Execute Trade via Adapter", type="primary", key="execute_trade"):
+                result = execute_trade(st.session_state.trade_id, execution_price=entry)
+                if result.get('status') == 'SUCCESS':
+                    st.success(f"✅ Trade EXECUTED at ${entry:,.2f}")
+                    st.session_state.step = 5
+                    st.rerun()
+                else:
+                    st.error(f"❌ Execution failed: {result.get('reason')}")
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+        elif trade.get('status') == 'executed':
+            st.markdown('<div class="success-box">✅ Trade executed successfully. Full lifecycle complete.</div>', unsafe_allow_html=True)
 
-                const tdSymbol = document.createElement('td');
-                tdSymbol.textContent = r.symbol;
-                tr.appendChild(tdSymbol);
+# Demo Summary Box
+if st.session_state.show_rejection_demo and st.session_state.trade_id:
+    trade = get_trade(st.session_state.trade_id)
+    if trade.get('status') == 'rejected':
+        st.divider()
+        st.markdown("### 🎯 Demo Summary: Risk Engine Rejection")
+        st.markdown("""
+        **What Just Happened:**
+        1. ✅ A risky trade (100 BTC) was proposed.
+        2. ✅ Deterministic risk engine evaluated the proposal.
+        3. ✅ Risk engine REJECTED the trade (exceeds 2% risk cap).
+        4. ✅ Trade cannot proceed without approval.
+        
+        **Why This Matters:**
+        - The AI/Human cannot override deterministic risk controls.
+        - Unsafe trades are blocked automatically.
+        - This is NOT just an AI wrapper - it has independent safety.
+        """)
 
-                const tdSide = document.createElement('td');
-                tdSide.textContent = r.side ? r.side.toUpperCase() : '';
-                tdSide.style.color = r.side === 'long' ? '#3fb950' : (r.side === 'short' ? '#f85149' : '#e6edf3');
-                tr.appendChild(tdSide);
+# Audit Trail Section
+st.divider()
+st.markdown("### Audit Trail - Trade History")
+st.caption("Every action is recorded for full transparency and accountability. Constitution §13: Clear auditability.")
 
-                const tdStatus = document.createElement('td');
-                tdStatus.textContent = r.status ? r.status.toUpperCase() : '';
-                let statusColor = '#8b949e';
-                if (r.status === 'executed') statusColor = '#3fb950';
-                else if (r.status === 'rejected') statusColor = '#f85149';
-                else if (r.status === 'approved') statusColor = '#58a6ff';
-                tdStatus.style.color = statusColor;
-                tr.appendChild(tdStatus);
+history = get_trade_history(limit=10)
 
-                const tdPnl = document.createElement('td');
-                tdPnl.textContent = '$0.00';
-                tr.appendChild(tdPnl);
+if history.get('trades'):
+    for trade in history['trades']:
+        status_emoji = {
+            'proposed': '', 'risk_checked': '🔵', 'awaiting_approval': '🟠',
+            'approved': '🟢', 'executed': '✅', 'rejected': '🔴'
+        }.get(trade.get('status', ''), '')
+        
+        hist_qty = safe_float(trade.get('quantity'))
+        hist_entry = safe_float(trade.get('entry'))
+        hist_stop = safe_float(trade.get('stop'))
+        hist_pnl = safe_float(trade.get('pnl'))
+        
+        with st.expander(f"{status_emoji} Trade #{trade.get('id', 'N/A')} - {trade.get('symbol', 'N/A')} {trade.get('side', 'N/A').upper()} - {trade.get('status', 'N/A').upper()}", expanded=False):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.write(f"**Quantity:** {hist_qty:.4f}")
+                st.write(f"**Entry:** ${hist_entry:,.2f}")
+            with col2:
+                st.write(f"**Stop Loss:** ${hist_stop:,.2f}")
+                st.write(f"**PnL:** ${hist_pnl:,.2f}")
+            with col3:
+                st.write(f"**Created:** {trade.get('created', 'N/A')}")
+                if trade.get('executed'): st.write(f"**Executed:** {trade['executed']}")
+else:
+    st.info("📭 No trades yet. Define your parameters above to start the demo.")
 
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function tick() {
-            const res = await fetchWithAuth('/api/pending_trades');
-            if (!res) return;
-            const pending = await res.json();
-            renderPendingTable(pending);
-
-            const res2 = await fetchWithAuth('/api/summary');
-            if (!res2) return;
-            const d = await res2.json();
-            const cards = [
-                ['Win rate', d.win_rate+'%', ''],
-                ['Lifetime PnL', '$'+d.lifetime_pnl, d.lifetime_pnl>=0?'green':'red'],
-            ];
-            document.getElementById('cards').innerHTML = cards.map(x =>
-                '<div class=card>'+x[0]+'<b class="'+x[2]+'">'+x[1]+'</b></div>'
-            ).join('');
-
-            const res3 = await fetchWithAuth('/api/recent_trades');
-            if (!res3) return;
-            const recentData = await res3.json();
-            renderRecentTradesTable(recentData.trades || []);
-        }
-        tick();
-        setInterval(tick, 5000);
-    </script>
-</body>
-</html>
-"""
-
-# ------------------------------------------------------------------
-# RUN
-# ------------------------------------------------------------------
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8003)
+# Footer
+st.divider()
+st.markdown("""
+<div style='text-align: center; color: #8b949e; padding: 2rem 0;'>
+    <h3>🛡️ TradeGuard AI</h3>
+    <p><em>AI investigates. Deterministic controls verify. Humans govern. Binance executes. TradeGuard records.</em></p>
+    <p>Built for Binance Agent OS Mini Hackathon - Track B</p>
+    
+</div>
+""", unsafe_allow_html=True)

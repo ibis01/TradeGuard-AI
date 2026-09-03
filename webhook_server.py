@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(BASE, "trades.db")
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "robo-shopper-dev-secret")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "tradeguard-ai-dev-secret")
 
 app = FastAPI()
 

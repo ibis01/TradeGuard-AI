@@ -10,4 +10,4 @@
 
 [6] THE MEMORY: every trade, PnL and my feedback — remembered forever
 
-[7] Live on Onchain OS: okx.ai/agents/10732 • github.com/ibis01/robo-shopper
+[7] Live on Onchain OS: okx.ai/agents/10732 • github.com/ibis01/tradeguard-ai

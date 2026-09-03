@@ -6,6 +6,22 @@ import os
 import sqlite3
 from datetime import timedelta
 
+TRADING_MODE = os.environ.get("TRADING_MODE", "paper").lower()
+
+# Validate trading mode
+if TRADING_MODE not in ["paper", "live"]:
+    raise ValueError(
+        f"Invalid TRADING_MODE: {TRADING_MODE}. "
+        f"Must be 'paper' (default) or 'live'."
+    )
+
+# Log trading mode on startup
+import logging
+logger = logging.getLogger(__name__)
+logger.warning(f"⚠️  TRADING MODE: {TRADING_MODE.upper()}")
+if TRADING_MODE == "live":
+    logger.error("🚨 LIVE TRADING ENABLED - REAL MONEY AT RISK 🚨")
+
 # --- Project Root ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 

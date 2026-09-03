@@ -21,7 +21,7 @@ import onchain_execution_mcp
 import guardrails_mcp
 
 # Initialize the MCP Server
-server = Server("robo-shopper-universal")
+server = Server("tradeguard-ai-universal")
 
 # ------------------------------------------------------------------
 # 1. TOOL REGISTRY (Canonical Schemas)
@@ -224,7 +224,7 @@ async def main():
             read_stream,
             write_stream,
             InitializationOptions(
-                server_name="robo-shopper-universal",
+                server_name="tradeguard-ai-universal",
                 server_version="5.0",
                 capabilities=server.get_capabilities(
                     notification_options=NotificationOptions(),

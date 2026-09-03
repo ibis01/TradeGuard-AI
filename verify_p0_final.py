@@ -6,7 +6,7 @@ from trade_memory_mcp import propose_trade
 from governance_engine import screen_trade, request_approval
 
 BASE = "http://localhost:8003"
-API_KEY = "robo-shopper-local-dev"
+API_KEY = "tradeguard-ai-local-dev"
 
 def run():
     # 1. Setup Trade
