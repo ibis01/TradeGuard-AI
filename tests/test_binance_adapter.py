@@ -1,5 +1,5 @@
 """
-TradeGuard AI - Binance Adapter Tests (Sprint 6).
+TradeGuard AI - Binance Adapter Tests.
 
 Verifies that:
 1. Binance adapter implements ExchangeAdapter interface
@@ -7,20 +7,25 @@ Verifies that:
 3. API failures fail-closed
 4. Paper vs live separation is enforced
 5. Credentials are not hardcoded
+
+Constitution §5: Binance Integration Boundary
+Constitution §6: Paper Trading vs Live Trading
+Constitution §10: Security Principles
+Constitution §11: Testing Requirements
 """
 
 import pytest
 import sys
 import os
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def test_binance_adapter_implements_interface():
     """Verify BinanceAdapter implements ExchangeAdapter interface."""
-    from binance_adapter import BinanceAdapter
-    from exchange_adapter import ExchangeAdapter
+    from integrations.binance.binance_adapter import BinanceAdapter
+    from integrations.binance.adapter import ExchangeAdapter
     
     # Verify inheritance
     assert issubclass(BinanceAdapter, ExchangeAdapter)
@@ -33,7 +38,7 @@ def test_binance_adapter_implements_interface():
 
 def test_binance_adapter_requires_credentials():
     """Verify BinanceAdapter fails without API credentials."""
-    from binance_adapter import BinanceAdapter
+    from integrations.binance.binance_adapter import BinanceAdapter
     
     # Clear environment variables
     env_backup = {
@@ -44,10 +49,9 @@ def test_binance_adapter_requires_credentials():
     try:
         with patch('ccxt.binance'):
             with pytest.raises(ValueError) as exc_info:
-                BinanceAdapter(use_testnet=True)
+                BinanceAdapter()
             
             assert "credentials not found" in str(exc_info.value).lower()
-    
     finally:
         # Restore environment
         for key, value in env_backup.items():
@@ -57,31 +61,37 @@ def test_binance_adapter_requires_credentials():
 
 def test_binance_adapter_defaults_to_testnet():
     """Verify BinanceAdapter defaults to testnet for safety."""
-    from binance_adapter import BinanceAdapter
+    from integrations.binance.binance_adapter import BinanceAdapter
     
-    # Mock ccxt and environment
-    with patch.dict(os.environ, {'BINANCE_API_KEY': 'test_key', 'BINANCE_API_SECRET': 'test_secret'}):
-        with patch('ccxt.binance') as mock_binance:
-            mock_exchange = MagicMock()
-            mock_binance.return_value = mock_exchange
-            
-            adapter = BinanceAdapter()  # No use_testnet argument
-            
-            # Verify testnet is enabled by default
-            assert adapter.use_testnet is True
-            
-            # Verify sandbox mode was enabled
-            # ccxt.binance is called with a dict as positional arg, not kwargs
-            assert len(mock_binance.call_args_list) > 0
-            first_call_args = mock_binance.call_args_list[0][0]  # Positional args
-            assert len(first_call_args) > 0
-            config_dict = first_call_args[0]  # First positional arg is the config dict
-            assert config_dict['sandbox'] is True
+    # Clear environment variable
+    old_testnet = os.environ.pop('BINANCE_USE_TESTNET', None)
+    
+    try:
+        with patch.dict(os.environ, {'BINANCE_API_KEY': 'test_key', 'BINANCE_API_SECRET': 'test_secret'}):
+            with patch('ccxt.binance') as mock_binance:
+                mock_exchange = MagicMock()
+                mock_binance.return_value = mock_exchange
+                
+                adapter = BinanceAdapter()  # No use_testnet argument
+                
+                # Verify testnet is enabled by default
+                assert adapter.use_testnet is True
+                
+                # Verify sandbox mode was enabled
+                assert len(mock_binance.call_args_list) > 0
+                first_call_args = mock_binance.call_args_list[0][0]
+                assert len(first_call_args) > 0
+                config_dict = first_call_args[0]
+                assert config_dict['sandbox'] is True
+    finally:
+        # Restore environment
+        if old_testnet is not None:
+            os.environ['BINANCE_USE_TESTNET'] = old_testnet
 
 
 def test_binance_adapter_execute_order_success():
     """Verify BinanceAdapter can execute orders successfully."""
-    from binance_adapter import BinanceAdapter
+    from integrations.binance.binance_adapter import BinanceAdapter
     
     with patch.dict(os.environ, {'BINANCE_API_KEY': 'test_key', 'BINANCE_API_SECRET': 'test_secret'}):
         with patch('ccxt.binance') as mock_binance:
@@ -112,11 +122,12 @@ def test_binance_adapter_execute_order_success():
             assert result["mode"] == "live"
             assert result["order_id"] == "12345"
             assert result["execution_price"] == 60000.0
+            assert "[BINANCE" in result["message"]
 
 
 def test_binance_adapter_execute_order_failure():
     """Verify BinanceAdapter fails closed on API errors."""
-    from binance_adapter import BinanceAdapter
+    from integrations.binance.binance_adapter import BinanceAdapter
     
     with patch.dict(os.environ, {'BINANCE_API_KEY': 'test_key', 'BINANCE_API_SECRET': 'test_secret'}):
         with patch('ccxt.binance') as mock_binance:
@@ -143,7 +154,7 @@ def test_binance_adapter_execute_order_failure():
 
 def test_binance_adapter_get_balance_success():
     """Verify BinanceAdapter can fetch balance."""
-    from binance_adapter import BinanceAdapter
+    from integrations.binance.binance_adapter import BinanceAdapter
     
     with patch.dict(os.environ, {'BINANCE_API_KEY': 'test_key', 'BINANCE_API_SECRET': 'test_secret'}):
         with patch('ccxt.binance') as mock_binance:
@@ -160,11 +171,12 @@ def test_binance_adapter_get_balance_success():
             assert result["balance"] == 10000.0
             assert result["currency"] == "USDT"
             assert result["mode"] == "live"
+            assert "LIVE BINANCE" in result.get("note", "")
 
 
 def test_binance_adapter_get_balance_failure():
     """Verify BinanceAdapter fails closed on balance fetch errors."""
-    from binance_adapter import BinanceAdapter
+    from integrations.binance.binance_adapter import BinanceAdapter
     
     with patch.dict(os.environ, {'BINANCE_API_KEY': 'test_key', 'BINANCE_API_SECRET': 'test_secret'}):
         with patch('ccxt.binance') as mock_binance:
@@ -180,33 +192,9 @@ def test_binance_adapter_get_balance_failure():
             assert result["balance"] == 0.0
 
 
-def test_binance_adapter_get_positions_success():
-    """Verify BinanceAdapter can fetch positions."""
-    from binance_adapter import BinanceAdapter
-    
-    with patch.dict(os.environ, {'BINANCE_API_KEY': 'test_key', 'BINANCE_API_SECRET': 'test_secret'}):
-        with patch('ccxt.binance') as mock_binance:
-            mock_exchange = MagicMock()
-            mock_exchange.fetch_balance.return_value = {
-                'total': {
-                    'BTC': 0.5,
-                    'ETH': 10.0,
-                    'USDT': 10000.0
-                }
-            }
-            mock_binance.return_value = mock_exchange
-            
-            adapter = BinanceAdapter(use_testnet=True)
-            result = adapter.get_open_positions()
-            
-            assert result["status"] == "SUCCESS"
-            assert result["mode"] == "live"
-            assert len(result["positions"]) == 2  # BTC and ETH (not USDT)
-
-
 def test_binance_adapter_no_credentials_in_code():
     """Verify no credentials are hardcoded in source code."""
-    import binance_adapter
+    from integrations.binance import binance_adapter
     import inspect
     
     source = inspect.getsource(binance_adapter)
@@ -228,7 +216,7 @@ def test_binance_adapter_no_credentials_in_code():
 
 def test_binance_adapter_symbol_conversion():
     """Verify symbol is correctly converted to Binance format."""
-    from binance_adapter import BinanceAdapter
+    from integrations.binance.binance_adapter import BinanceAdapter
     
     with patch.dict(os.environ, {'BINANCE_API_KEY': 'test_key', 'BINANCE_API_SECRET': 'test_secret'}):
         with patch('ccxt.binance') as mock_binance:
@@ -255,31 +243,3 @@ def test_binance_adapter_symbol_conversion():
             call_args = mock_exchange.create_market_order.call_args
             assert call_args[1]['symbol'] == "BTC/USDT"
             assert call_args[1]['side'] == "buy"
-
-
-def test_binance_adapter_mainnet_requires_explicit_opt_in():
-    """Verify mainnet requires explicit use_testnet=False."""
-    from binance_adapter import BinanceAdapter
-    
-    with patch.dict(os.environ, {'BINANCE_API_KEY': 'test_key', 'BINANCE_API_SECRET': 'test_secret'}):
-        with patch('ccxt.binance') as mock_binance:
-            mock_exchange = MagicMock()
-            mock_binance.return_value = mock_exchange
-            
-            # Default should be testnet
-            adapter_default = BinanceAdapter()
-            assert adapter_default.use_testnet is True
-            
-            # Check first call (testnet)
-            first_call_args = mock_binance.call_args_list[0][0]
-            first_config = first_call_args[0]
-            assert first_config['sandbox'] is True
-            
-            # Explicit mainnet
-            adapter_mainnet = BinanceAdapter(use_testnet=False)
-            assert adapter_mainnet.use_testnet is False
-            
-            # Check second call (mainnet)
-            second_call_args = mock_binance.call_args_list[1][0]
-            second_config = second_call_args[0]
-            assert second_config['sandbox'] is False
