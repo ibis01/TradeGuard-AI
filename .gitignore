@@ -1,22 +1,51 @@
-.venv/
-__pycache__/
-*.pyc
-.env
-trades.db
-voice.log
-voice.pid
-.DS_Store
+# Database & State
+*.db
+*.sqlite
+*.sqlite3
+*.jsonl
+*.log
 
-# V4 hygiene
-venv/
-.venv/
-ngrok
-*.tgz
-*.mp4
+# Environment
 .env
-trades.db
+.env.local
+
+# Python
 __pycache__/
-*.pyc
-venv/
-robo-shopper/
-scripts/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Diagnostics & Backups (The "Vibe Code" cleanup)
+*_backup.py
+*.deprecated
+diagnose_*.py
+fix_*.py
+verify_*.py
+tatus*

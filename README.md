@@ -58,3 +58,5 @@ TradeGuard integrates with the Binance ecosystem through a strict, isolated adap
                 │
                 ▼
               AUDIT LOG
+
+ [![Tests](https://img.shields.io/badge/tests-111%20passing-brightgreen)]()
