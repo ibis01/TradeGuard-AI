@@ -1,74 +1,49 @@
-# Database & State
-*.db
-*.sqlite
-*.sqlite3
-*.jsonl
-*.log
-
-# Environment
-.env
-.env.local
-
-# Python
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
 
-# IDE
+# --- Virtual Environments ---
+venv/
+.venv/
+ENV/
+env/
+
+# --- IDE & OS ---
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Diagnostics & Backups (The "Vibe Code" cleanup)
+# --- Environment & Secrets ---
+.env
+.env.local
+.env.*.local
+
+# --- Database & State Artifacts ---
+*.db
+*.sqlite
+*.sqlite3
+*.jsonl
+*.log
+*.pid
+
+# --- Diagnostics, Backups & Merge Artifacts ---
 *_backup.py
 *.deprecated
 diagnose_*.py
 fix_*.py
 verify_*.py
-<<<<<<< HEAD
 tatus*
-# --- Virtual Environments ---
-venv/
-.venv/
-env/
-ENV/
-
-# --- Binaries & Large Artifacts ---
+*.tgz
 ngrok
 ngrok-v3-stable-linux-amd64.tgz
-*.tgz
-voice.pid
-*.db
-*.sqlite
-*.jsonl
-
-# --- OS & IDE ---
-.DS_Store
-.vscode/
-.idea/
-=======
-tatus*
->>>>>>> 9a19eadc17416e62bda2dcc99537b4ff659fe63d
