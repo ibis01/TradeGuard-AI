@@ -49,3 +49,22 @@ diagnose_*.py
 fix_*.py
 verify_*.py
 tatus*
+# --- Virtual Environments ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Binaries & Large Artifacts ---
+ngrok
+ngrok-v3-stable-linux-amd64.tgz
+*.tgz
+voice.pid
+*.db
+*.sqlite
+*.jsonl
+
+# --- OS & IDE ---
+.DS_Store
+.vscode/
+.idea/
