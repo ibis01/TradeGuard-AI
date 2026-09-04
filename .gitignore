@@ -48,6 +48,7 @@ Thumbs.db
 diagnose_*.py
 fix_*.py
 verify_*.py
+<<<<<<< HEAD
 tatus*
 # --- Virtual Environments ---
 venv/
@@ -68,3 +69,6 @@ voice.pid
 .DS_Store
 .vscode/
 .idea/
+=======
+tatus*
+>>>>>>> 9a19eadc17416e62bda2dcc99537b4ff659fe63d
