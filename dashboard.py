@@ -88,13 +88,13 @@ with col2:
 with col3: 
     st.markdown('<div class="status-card"><div style="font-size:2rem">⚖️</div><div style="color:#8b949e;font-size:0.9rem">Governance</div><div style="color:#3fb950;font-weight:600">Enforcing</div></div>', unsafe_allow_html=True)
 with col4:
-    # Truthful adapter status based on runtime config
+        # Truthful adapter status based on runtime config (no false "Connected" claims)
     if TRADING_MODE == "paper":
         adapter_status = "Paper Adapter Active"
         status_color = "#3fb950"
     else:
         is_testnet = os.environ.get("BINANCE_USE_TESTNET", "true").lower() == "true"
-        adapter_status = "Binance Testnet Connected" if is_testnet else "Binance Mainnet Connected"
+        adapter_status = "Binance Testnet Mode" if is_testnet else "Binance Mainnet Mode"
         status_color = "#d29922" if is_testnet else "#f85149"
         
     st.markdown(f'<div class="status-card"><div style="font-size:2rem">🔗</div><div style="color:#8b949e;font-size:0.9rem">Execution Adapter</div><div style="color:{status_color};font-weight:600">{adapter_status}</div></div>', unsafe_allow_html=True)
