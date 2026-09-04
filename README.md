@@ -2,25 +2,22 @@
 
 **A Risk-Governed AI Trading Agent for Binance Agent OS (Track B)**
 
-> _"AI investigates. Deterministic controls verify. Humans govern. Binance executes. TradeGuard records."_
+> *"AI investigates. Deterministic controls verify. Humans govern. Binance executes. TradeGuard records."*
 
-[![Tests](https://img.shields.io/badge/tests-118%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-RUN_LOCALLY-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)]()
 
 ---
 
 ## 🎯 The Problem
-
-Most AI trading agents are dangerous black boxes. If the LLM hallucinates a risk metric, ignores a stop-loss, or bypasses safety rules, the user loses capital. Autonomous execution without governance is a critical vulnerability.
+Most AI trading agents are dangerous black boxes. If the LLM hallucinates a risk metric or ignores a stop-loss, the user loses capital. Autonomous execution without governance is a critical vulnerability.
 
 ## 💡 The Solution
-
-TradeGuard AI is **not** an autonomous trading bot. It is a **governed AI agent** that demonstrates how AI can participate in trading decisions _without_ being trusted with unrestricted control over capital.
+TradeGuard AI is **not** an autonomous trading bot. It is a **governed AI agent** that demonstrates how AI can participate in trading decisions *without* being trusted with unrestricted control over capital. 
 
 We separate concerns:
-
-1. **AI Investigates & Proposes**: The agent analyzes market context and proposes a structured trade.
-2. **Deterministic Rules Validate**: Hardcoded risk engines (2% risk cap, exposure limits) independently evaluate the proposal. The AI _cannot_ override this.
+1. **Agent Investigates & Proposes**: The agent (or deterministic demo agent) analyzes context and proposes a structured trade.
+2. **Deterministic Rules Validate**: Hardcoded risk engines (2% risk cap, exposure limits) independently evaluate the proposal. The AI *cannot* override this.
 3. **Humans Authorize**: Explicit, cryptographically-bound human approval is required.
 4. **Binance Executes**: Only validated, approved intents reach the Binance execution adapter.
 
@@ -28,14 +25,14 @@ We separate concerns:
 
 ## 🏗️ Track B Architecture
 
-TradeGuard integrates with the Binance ecosystem through a strict, isolated adapter boundary and MCP tooling.
+TradeGuard integrates with the Binance ecosystem through a strict, isolated adapter boundary.
 
 ```text
                     USER OBJECTIVE
                           │
                           ▼
-                 🤖 AGENT / MCP LAYER
-          (Analyzes market data, proposes trade)
+                 🤖 AGENT / DEMO LAYER
+          (Generates reproducible, safe proposals)
                           │
                           ▼
                   TRADE PROPOSAL
@@ -49,7 +46,7 @@ TradeGuard integrates with the Binance ecosystem through a strict, isolated adap
           ⚖️ GOVERNANCE              AUDIT LOG
                 │
                 ▼
-          👤 HUMAN APPROVAL
+           HUMAN APPROVAL
      (Cryptographic token, hash-bound)
                 │
                 ▼
@@ -61,4 +58,3 @@ TradeGuard integrates with the Binance ecosystem through a strict, isolated adap
                 │
                 ▼
               AUDIT LOG
-```
