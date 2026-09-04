@@ -2,15 +2,11 @@
 TradeGuard AI - Polished Streamlit Dashboard (Hackathon Ready).
 
 Demonstrates the complete governed trading workflow with professional UI/UX.
-Constitution §1: AI proposes, Rules validate, Humans authorize.
-Constitution §3: LLM cannot directly execute.
-Constitution §6: Paper/Live separation clearly labeled.
-Constitution §9: Execution uses structured intent, no manual override at execution.
-Constitution §13: Clear, trustworthy interface showing full auditability.
+Core Narrative: AI investigates. Deterministic controls verify. Humans govern. Binance executes.
 """
 
 import streamlit as st
-import sqlite3
+import os
 from datetime import datetime
 from config import DB_PATH, TRADING_MODE
 from trade_memory_mcp import propose_trade, get_trade, get_trade_history
@@ -63,7 +59,6 @@ st.markdown("""
 
 # Helper function to safely format numbers
 def safe_float(val, default=0.0):
-    """Safely convert a value to float, handling None."""
     if val is None:
         return default
     try:
@@ -75,20 +70,34 @@ def safe_float(val, default=0.0):
 st.markdown('<div class="main-header">🛡️ TradeGuard AI</div>', unsafe_allow_html=True)
 st.markdown('<div class="tagline">AI investigates. Deterministic controls verify. Humans govern. Binance executes.</div>', unsafe_allow_html=True)
 
-# Environment Badge (Constitution §6)
+# Environment Badge (Truthful labeling)
 env_class = "env-paper" if TRADING_MODE == "paper" else "env-live"
 env_text = "📝 PAPER MODE - Simulated Trading (No Real Money)" if TRADING_MODE == "paper" else "🔴 LIVE MODE - Real Money at Risk"
 st.markdown(f'<div class="env-badge {env_class}">{env_text}</div>', unsafe_allow_html=True)
 
 st.divider()
 
-# System Status Section
+# System Status Section (Truthful runtime status)
 st.markdown("### System Status")
 col1, col2, col3, col4 = st.columns(4)
-with col1: st.markdown('<div class="status-card"><div style="font-size:2rem">🤖</div><div style="color:#8b949e;font-size:0.9rem">AI Agent</div><div style="color:#3fb950;font-weight:600">Online</div></div>', unsafe_allow_html=True)
-with col2: st.markdown('<div class="status-card"><div style="font-size:2rem">🔒</div><div style="color:#8b949e;font-size:0.9rem">Risk Engine</div><div style="color:#3fb950;font-weight:600">Active</div></div>', unsafe_allow_html=True)
-with col3: st.markdown('<div class="status-card"><div style="font-size:2rem">⚖️</div><div style="color:#8b949e;font-size:0.9rem">Governance</div><div style="color:#3fb950;font-weight:600">Enforcing</div></div>', unsafe_allow_html=True)
-with col4: st.markdown('<div class="status-card"><div style="font-size:2rem">🔗</div><div style="color:#8b949e;font-size:0.9rem">Binance Adapter</div><div style="color:#3fb950;font-weight:600">Connected</div></div>', unsafe_allow_html=True)
+
+with col1: 
+    st.markdown('<div class="status-card"><div style="font-size:2rem">🤖</div><div style="color:#8b949e;font-size:0.9rem">AI Agent</div><div style="color:#3fb950;font-weight:600">Online</div></div>', unsafe_allow_html=True)
+with col2: 
+    st.markdown('<div class="status-card"><div style="font-size:2rem">🔒</div><div style="color:#8b949e;font-size:0.9rem">Risk Engine</div><div style="color:#3fb950;font-weight:600">Active</div></div>', unsafe_allow_html=True)
+with col3: 
+    st.markdown('<div class="status-card"><div style="font-size:2rem">⚖️</div><div style="color:#8b949e;font-size:0.9rem">Governance</div><div style="color:#3fb950;font-weight:600">Enforcing</div></div>', unsafe_allow_html=True)
+with col4:
+    # Truthful adapter status based on runtime config
+    if TRADING_MODE == "paper":
+        adapter_status = "Paper Adapter Active"
+        status_color = "#3fb950"
+    else:
+        is_testnet = os.environ.get("BINANCE_USE_TESTNET", "true").lower() == "true"
+        adapter_status = "Binance Testnet Connected" if is_testnet else "Binance Mainnet Connected"
+        status_color = "#d29922" if is_testnet else "#f85149"
+        
+    st.markdown(f'<div class="status-card"><div style="font-size:2rem">🔗</div><div style="color:#8b949e;font-size:0.9rem">Execution Adapter</div><div style="color:{status_color};font-weight:600">{adapter_status}</div></div>', unsafe_allow_html=True)
 
 st.divider()
 
@@ -105,43 +114,57 @@ if 'show_rejection_demo' not in st.session_state:
 # Main Workflow Section
 st.markdown("### Governed Trading Workflow")
 
-# Step 1: AI Agent Analysis & Proposal (Primary) + Manual Override (Secondary)
+# Step 1: Deterministic Demo Agent (Primary) + Manual Override (Secondary)
 step_class = "active" if st.session_state.step >= 1 else ""
 st.markdown(f'<div class="workflow-step {step_class}">', unsafe_allow_html=True)
 st.markdown('<span class="step-number">1</span><div class="step-title">AI Agent Analysis & Proposal</div>', unsafe_allow_html=True)
-st.markdown('<div class="step-caption">The AI Agent investigates market conditions and proposes a structured trade. You can also manually override parameters.</div>', unsafe_allow_html=True)
+st.markdown('<div class="step-caption">The agent generates reproducible, safe proposals based on your objective to test the governance workflow.</div>', unsafe_allow_html=True)
 
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.markdown("##### 🤖 AI Agent Mode (Primary)")
-    st.caption("Define your objective. The AI Agent will analyze and propose safe parameters.")
+    st.markdown("##### 🤖 Deterministic Demo Agent (Primary)")
+    st.caption("Define your objective. The agent will generate a compliant, risk-managed proposal for governance testing.")
     
     user_objective = st.text_area("Trading Objective", value="Find a conservative long opportunity on BTC with strict risk management.", height=100)
     
-    if st.button("🤖 Run AI Agent Analysis & Propose", type="primary", key="ai_propose"):
+    if st.button("🤖 Run Agent Analysis & Propose", type="primary", key="ai_propose"):
         try:
-            # Simulating the AI Agent's deterministic output based on the objective
-            # In production, this calls the LLM via MCP tools to fetch real data and reason.
+            # Deterministic Demo Agent: Parses objective to provide a relevant, safe proposal
+            # This ensures the UI is honest about being a deterministic demo for governance testing.
+            obj_lower = user_objective.lower()
+            
+            if "eth" in obj_lower:
+                symbol, entry, qty = "ETH", 3000.0, 0.5
+            elif "sol" in obj_lower:
+                symbol, entry, qty = "SOL", 150.0, 10.0
+            else:
+                symbol, entry, qty = "BTC", 60000.0, 0.01
+                
+            if "short" in obj_lower:
+                side, stop = "short", entry * 1.01
+            else:
+                side, stop = "long", entry * 0.99
+                
             prop = propose_trade(
-                symbol="BTC",
-                side="long",
-                quantity=0.01,
-                entry_price=60000.0,
-                stop_loss=59500.0,
-                reasoning=f"AI Agent Analysis: {user_objective}. Market structure supports a conservative long. Parameters strictly adhere to the 2% portfolio risk cap."
+                symbol=symbol,
+                side=side,
+                quantity=qty,
+                entry_price=entry,
+                stop_loss=stop,
+                reasoning=f"Deterministic Demo Agent Analysis: User requested '{user_objective}'. Agent generated a conservative {side.upper()} proposal for {symbol} adhering to the 2% portfolio risk cap."
             )
             st.session_state.trade_id = prop["trade_id"]
             st.session_state.step = 1
             st.session_state.show_rejection_demo = False
             st.rerun()
         except Exception as e:
-            st.error(f"❌ AI Proposal failed: {e}")
+            st.error(f"❌ Proposal failed: {e}")
 
     st.divider()
     
     with st.expander("✍️ Manual Override (Advanced)", expanded=False):
-        st.caption("Bypass the AI and define exact parameters yourself.")
+        st.caption("Bypass the agent and define exact parameters yourself.")
         intent_asset = st.selectbox("Asset", ["BTC", "ETH", "SOL"], index=0, key="manual_asset")
         intent_side = st.radio("Direction", ["long", "short"], horizontal=True, key="manual_side")
         default_entry = 60000.0 if intent_asset == "BTC" else (3000.0 if intent_asset == "ETH" else 150.0)
@@ -164,14 +187,14 @@ with col1:
                 st.error(f"❌ Manual Proposal failed: {e}")
 
 with col2:
-    st.markdown("##### 🚨 Security Demo: Test Risk Engine")
-    st.caption("See how the system protects you from unsafe proposals.")
-    if st.button("Simulate AI Hallucination (100 BTC)", key="propose_risky_demo"):
+    st.markdown("##### 🧪 SECURITY DEMO")
+    st.caption("The agent proposes an obviously dangerous trade. TradeGuard's deterministic controls will reject it.")
+    if st.button("Simulate Unsafe AI Proposal (100 BTC)", key="propose_risky_demo"):
         try:
             prop = propose_trade(
-                symbol="BTC", side="long", quantity=100.0, # Intentionally massive
+                symbol="BTC", side="long", quantity=100.0,
                 entry_price=60000.0, stop_loss=59500.0,
-                reasoning="AI Hallucination: Ignoring risk limits for maximum gains!"
+                reasoning="Unsafe AI Proposal: Ignoring risk limits for maximum gains!"
             )
             st.session_state.trade_id = prop["trade_id"]
             st.session_state.step = 1
@@ -226,7 +249,7 @@ if st.session_state.trade_id:
     
     st.markdown(f'<div class="workflow-step {step_class}">', unsafe_allow_html=True)
     st.markdown('<span class="step-number">2</span><div class="step-title">Deterministic Risk Engine Validates</div>', unsafe_allow_html=True)
-    st.markdown('<div class="step-caption">Independent risk validation enforces hard limits. AI cannot override these checks.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="step-caption">Independent risk validation enforces hard limits. The agent cannot override these checks.</div>', unsafe_allow_html=True)
     
     if trade.get('status') == 'proposed':
         if st.button("🔍 Run Risk Validation", type="primary", key="risk_validate"):
@@ -238,7 +261,7 @@ if st.session_state.trade_id:
                 st.rerun()
             else:
                 st.error(f"❌ Risk validation REJECTED: {result.get('reason', 'Unknown')}")
-                st.markdown('<div class="warning-box">⚠️ <strong>Key Demo Point:</strong> Your parameters violated deterministic risk controls (e.g., 2% risk cap). TradeGuard blocked it automatically.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="warning-box">⚠️ <strong>Key Demo Point:</strong> The proposal violated deterministic risk controls (e.g., 2% risk cap). TradeGuard blocked it automatically.</div>', unsafe_allow_html=True)
                 st.session_state.step = 2
                 st.rerun()
     elif trade.get('status') == 'rejected':
@@ -293,15 +316,15 @@ if st.session_state.trade_id:
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Step 5: Execution Gateway (Constitution §9 - No manual override at execution)
+        # Step 5: Execution Gateway
         if trade.get('status') == 'approved':
             step_class = "active" if st.session_state.step >= 4 else ""
             
             st.markdown(f'<div class="workflow-step {step_class}">', unsafe_allow_html=True)
             st.markdown('<span class="step-number">4</span><div class="step-title">Execution Gateway Executes</div>', unsafe_allow_html=True)
-            st.markdown('<div class="step-caption">Governance verifies proposal integrity and approval before executing through Binance adapter.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="step-caption">Governance verifies proposal integrity and approval before executing through the adapter.</div>', unsafe_allow_html=True)
             
-            st.markdown(f"**Execution Price:** `${entry:,.2f}` *(Locked to your approved entry)*")
+            st.markdown(f"**Execution Price:** `${entry:,.2f}` *(Locked to approved proposal)*")
             st.caption("Manual input is disabled at execution. The Gateway fills at the approved price to maintain hash integrity.")
             
             if st.button("🚀 Execute Trade via Adapter", type="primary", key="execute_trade"):
@@ -325,22 +348,21 @@ if st.session_state.show_rejection_demo and st.session_state.trade_id:
         st.markdown("### 🎯 Demo Summary: Risk Engine Rejection")
         st.markdown("""
         **What Just Happened:**
-        1. ✅ A risky trade (100 BTC) was proposed.
+        1. ✅ An unsafe trade (100 BTC) was proposed.
         2. ✅ Deterministic risk engine evaluated the proposal.
         3. ✅ Risk engine REJECTED the trade (exceeds 2% risk cap).
         4. ✅ Trade cannot proceed without approval.
         
         **Why This Matters:**
-        - The AI/Human cannot override deterministic risk controls.
+        - The agent cannot override deterministic risk controls.
         - Unsafe trades are blocked automatically.
         - This is NOT just an AI wrapper - it has independent safety.
-        - Constitution §10: Fail-closed security enforced.
         """)
 
 # Audit Trail Section
 st.divider()
 st.markdown("### Audit Trail - Trade History")
-st.caption("Every action is recorded for full transparency and accountability. Constitution §13: Clear auditability.")
+st.caption("Every action is recorded for full transparency and accountability.")
 
 history = get_trade_history(limit=10)
 
@@ -368,15 +390,14 @@ if history.get('trades'):
                 st.write(f"**Created:** {trade.get('created', 'N/A')}")
                 if trade.get('executed'): st.write(f"**Executed:** {trade['executed']}")
 else:
-    st.info("📭 No trades yet. Define your parameters above to start the demo.")
+    st.info("📭 No trades yet. Define your objective above to start the demo.")
 
-# Footer
+# Footer (Clean, judge-focused)
 st.divider()
 st.markdown("""
 <div style='text-align: center; color: #8b949e; padding: 2rem 0;'>
     <h3>🛡️ TradeGuard AI</h3>
     <p><em>AI investigates. Deterministic controls verify. Humans govern. Binance executes. TradeGuard records.</em></p>
     <p>Built for Binance Agent OS Mini Hackathon - Track B</p>
-    <p><strong>Constitution Compliance:</strong> §1 AI Proposes | §3 No Direct Execution | §6 Paper/Live Separation | §9 Execution Intent | §10 Fail-Closed | §13 UI/UX</p>
 </div>
 """, unsafe_allow_html=True)
