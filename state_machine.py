@@ -1,3 +1,4 @@
+# state_machine.py
 """
 TradeGuard AI - Single State-Transition Authority (Sprint 5).
 ONE function responsible for EVERY state mutation.
@@ -6,7 +7,7 @@ Supports external connections for atomic transactions.
 import sqlite3
 import json
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from config import DB_PATH
 from schemas import TradeStatus, ActorType
@@ -19,8 +20,8 @@ ALLOWED_TRANSITIONS = {
     TradeStatus.AWAITING_APPROVAL: [TradeStatus.APPROVED, TradeStatus.REJECTED],
     TradeStatus.APPROVED: [TradeStatus.EXECUTED, TradeStatus.CLOSED],  # cannot reject after approval
     TradeStatus.EXECUTED: [TradeStatus.CLOSED],
-    TradeStatus.REJECTED: [],
-    TradeStatus.CLOSED: [],
+    TradeStatus.REJECTED: [],  # Terminal state
+    TradeStatus.CLOSED: [],    # Terminal state
 }
 
 # --- Authorized actors ---
@@ -43,12 +44,20 @@ def _is_already_in_state(conn: sqlite3.Connection, trade_id: int, target_status:
     row = cursor.fetchone()
     return row and row[0] == target_status.value
 
+
+def _get_current_status(conn: sqlite3.Connection, trade_id: int) -> Optional[str]:
+    """Get current status of a trade."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT status FROM trades WHERE id = ?", (trade_id,))
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+
 # ------------------------------------------------------------------
 # 🔒 IMMUTABLE AUDIT LOG (uses the same connection)
 # ------------------------------------------------------------------
-def _log_event(conn: sqlite3.Connection, trade_id: int, event_type: str, actor_type: str, old_status: str, new_status: str, metadata: dict):
-    """Append an immutable audit event using the provided connection."""
-    import json
+def _ensure_audit_table(conn: sqlite3.Connection):
+    """Ensure the audit log table exists."""
     conn.execute("""
         CREATE TABLE IF NOT EXISTS trade_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,10 +70,18 @@ def _log_event(conn: sqlite3.Connection, trade_id: int, event_type: str, actor_t
             created_at TIMESTAMP
         )
     """)
+
+
+def _log_event(conn: sqlite3.Connection, trade_id: int, event_type: str, actor_type: str, 
+               old_status: str, new_status: str, metadata: dict):
+    """Append an immutable audit event using the provided connection."""
+    _ensure_audit_table(conn)
     conn.execute("""
         INSERT INTO trade_events (trade_id, event_type, actor_type, old_status, new_status, metadata, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (trade_id, event_type, actor_type, old_status, new_status, json.dumps(metadata), datetime.now(timezone.utc).isoformat()))
+    """, (trade_id, event_type, actor_type, old_status, new_status, 
+          json.dumps(metadata), datetime.now(timezone.utc).isoformat()))
+
 
 # ------------------------------------------------------------------
 # SINGLE STATE-TRANSITION AUTHORITY
@@ -80,12 +97,24 @@ def transition_trade(
     """
     SINGLE SOURCE OF TRUTH for all trade state changes.
     Enforces: legality, actor auth, hash match, atomicity, idempotency.
+    
+    Args:
+        trade_id: ID of the trade to transition
+        target_status: Desired new status
+        actor: Who is performing this transition
+        metadata: Additional data to store with the transition
+        require_approval_hash: Required hash for EXECUTED transitions
+        conn: Optional existing database connection (for atomic transactions)
+    
+    Returns:
+        Dict with status, trade_id, message, and transition details
     """
     metadata = metadata or {}
     own_connection = False
     
     if conn is None:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        conn.execute("PRAGMA journal_mode=WAL;")
         own_connection = True
         conn.execute("BEGIN TRANSACTION")
     
@@ -101,12 +130,13 @@ def transition_trade(
                 "status": "SUCCESS",
                 "trade_id": trade_id,
                 "message": f"Trade already in {target_status.value}. Idempotent.",
-                "idempotent": True
+                "idempotent": True,
+                "new_status": target_status.value
             }
         
         # Fetch current state
         cursor.execute("""
-            SELECT id, status, proposal_hash, entry_price, quantity, stop_loss
+            SELECT id, status, proposal_hash, entry_price, quantity, stop_loss, symbol, side
             FROM trades WHERE id = ?
         """, (trade_id,))
         row = cursor.fetchone()
@@ -114,13 +144,30 @@ def transition_trade(
             if own_connection:
                 conn.rollback()
                 conn.close()
-            return {"status": "ERROR", "trade_id": trade_id, "message": f"Trade {trade_id} not found."}
+            return {
+                "status": "ERROR", 
+                "trade_id": trade_id, 
+                "message": f"Trade {trade_id} not found."
+            }
         
-        current_status = TradeStatus(row[1])
+        current_status_str = row[1]
+        try:
+            current_status = TradeStatus(current_status_str)
+        except ValueError:
+            if own_connection:
+                conn.rollback()
+                conn.close()
+            return {
+                "status": "ERROR",
+                "trade_id": trade_id,
+                "message": f"Invalid current status: {current_status_str}"
+            }
+        
         stored_hash = row[2]
         
         # Validate transition legality
         if target_status not in ALLOWED_TRANSITIONS.get(current_status, []):
+            allowed = [s.value for s in ALLOWED_TRANSITIONS.get(current_status, [])]
             if own_connection:
                 conn.rollback()
                 conn.close()
@@ -129,10 +176,11 @@ def transition_trade(
                 "trade_id": trade_id,
                 "message": (
                     f"ILLEGAL: {current_status.value} → {target_status.value}. "
-                    f"Allowed: {[s.value for s in ALLOWED_TRANSITIONS.get(current_status, [])]}"
+                    f"Allowed: {allowed}"
                 ),
                 "current_status": current_status.value,
-                "target_status": target_status.value
+                "target_status": target_status.value,
+                "allowed_transitions": allowed
             }
         
         # Validate actor
@@ -145,7 +193,8 @@ def transition_trade(
                 "status": "REJECTED",
                 "trade_id": trade_id,
                 "message": f"UNAUTHORIZED: {actor.value} cannot perform {target_status.value}.",
-                "authorized_actors": [a.value for a in authorized]
+                "authorized_actors": [a.value for a in authorized],
+                "actor": actor.value
             }
         
         # Special: EXECUTED requires approval hash
@@ -188,13 +237,20 @@ def transition_trade(
         ]
         params = [target_status.value, datetime.now(timezone.utc).isoformat(), actor.value]
 
+        # Add metadata fields if they exist in the table
         if metadata:
-            _cols = {r[1] for r in conn.execute("PRAGMA table_info(trades)").fetchall()}
-            for key in ["execution_price", "executed_by"]:
-                if key in metadata and key in _cols:
+            # Get table columns
+            cursor.execute("PRAGMA table_info(trades)")
+            columns = {row[1] for row in cursor.fetchall()}
+            
+            # Safe metadata fields to update
+            safe_metadata_fields = ["execution_price", "executed_by", "approved_by", "rejection_reason"]
+            for key in safe_metadata_fields:
+                if key in metadata and key in columns:
                     set_clauses.append(f"{key} = ?")
                     params.append(metadata[key])
         
+        # Add status-specific timestamp
         status_col_map = {
             TradeStatus.PROPOSED: "proposed_at",
             TradeStatus.RISK_CHECKED: "risk_checked_at",
@@ -207,10 +263,12 @@ def transition_trade(
             set_clauses.append(f"{status_col_map[target_status]} = ?")
             params.append(datetime.now(timezone.utc).isoformat())
         
+        # Store metadata as JSON if provided
         if metadata:
             set_clauses.append("transition_metadata = ?")
             params.append(json.dumps(metadata))
         
+        # Add old status for WHERE clause
         params.append(trade_id)
         params.append(current_status.value)
         
@@ -254,11 +312,21 @@ def transition_trade(
             "status": "SUCCESS",
             "trade_id": trade_id,
             "new_status": target_status.value,
+            "old_status": current_status.value,
             "actor": actor.value,
             "message": f"Trade {trade_id} → {target_status.value} by {actor.value}.",
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
+    except sqlite3.Error as e:
+        if own_connection:
+            conn.rollback()
+            conn.close()
+        return {
+            "status": "ERROR",
+            "trade_id": trade_id,
+            "message": f"Database error during state transition: {str(e)}"
+        }
     except Exception as e:
         if own_connection:
             conn.rollback()
@@ -268,3 +336,104 @@ def transition_trade(
             "trade_id": trade_id,
             "message": f"State transition failed: {str(e)}"
         }
+
+
+# ------------------------------------------------------------------
+# HELPER: Get transition history for a trade
+# ------------------------------------------------------------------
+def get_transition_history(trade_id: int, limit: int = 50) -> Dict[str, Any]:
+    """
+    Get the audit history for a specific trade.
+    
+    Args:
+        trade_id: ID of the trade
+        limit: Maximum number of events to return
+    
+    Returns:
+        Dict with trade_id and list of events
+    """
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        cursor = conn.cursor()
+        
+        _ensure_audit_table(conn)
+        
+        cursor.execute("""
+            SELECT id, event_type, actor_type, old_status, new_status, metadata, created_at
+            FROM trade_events
+            WHERE trade_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+        """, (trade_id, limit))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        events = []
+        for row in rows:
+            try:
+                metadata = json.loads(row[5]) if row[5] else {}
+            except:
+                metadata = {}
+            events.append({
+                "id": row[0],
+                "event_type": row[1],
+                "actor": row[2],
+                "old_status": row[3],
+                "new_status": row[4],
+                "metadata": metadata,
+                "created_at": row[6]
+            })
+        
+        return {
+            "trade_id": trade_id,
+            "events": events,
+            "count": len(events)
+        }
+        
+    except Exception as e:
+        return {
+            "trade_id": trade_id,
+            "events": [],
+            "count": 0,
+            "error": str(e)
+        }
+
+
+# ------------------------------------------------------------------
+# HELPER: Validate transition is legal
+# ------------------------------------------------------------------
+def is_transition_legal(current_status: TradeStatus, target_status: TradeStatus) -> bool:
+    """Check if a transition is legal."""
+    return target_status in ALLOWED_TRANSITIONS.get(current_status, [])
+
+
+def is_actor_authorized(target_status: TradeStatus, actor: ActorType) -> bool:
+    """Check if an actor is authorized for a target status."""
+    return actor in AUTHORIZED_ACTORS.get(target_status, [])
+
+
+# ------------------------------------------------------------------
+# HELPER: Get available transitions for a status
+# ------------------------------------------------------------------
+def get_available_transitions(status: TradeStatus) -> List[str]:
+    """Get list of available transitions from a given status."""
+    transitions = ALLOWED_TRANSITIONS.get(status, [])
+    return [t.value for t in transitions]
+
+
+def get_authorized_actors(status: TradeStatus) -> List[str]:
+    """Get list of authorized actors for a target status."""
+    actors = AUTHORIZED_ACTORS.get(status, [])
+    return [a.value for a in actors]
+
+
+# ------------------------------------------------------------------
+# SELF-TEST
+# ------------------------------------------------------------------
+if __name__ == "__main__":
+    print("🧪 Testing State Machine...")
+    # Test with a sample trade ID (will fail if trade doesn't exist)
+    # This is just to demonstrate the API
+    print("✅ State Machine loaded successfully")
