@@ -66,6 +66,26 @@ def clear_cache():
 # PRICE FETCHERS (parallel)
 # ============================================================================
 
+# Yahoo Finance headers (required to avoid 403)
+_YAHOO_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+def _fetch_yahoo(symbol: str) -> Optional[float]:
+    try:
+        ticker = f"{symbol.upper()}-USD"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+        resp = requests.get(url, timeout=REQUEST_TIMEOUT, headers=_YAHOO_HEADERS)
+        if resp.status_code == 200:
+            data = resp.json()
+            result = data.get("chart", {}).get("result")
+            if result:
+                return float(result[0]["meta"]["regularMarketPrice"])
+    except:
+        pass
+    return None
+
 def _fetch_binance(symbol: str) -> Optional[float]:
     try:
         url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT"
@@ -153,6 +173,7 @@ def get_live_market_data(symbol: str) -> Optional[Dict[str, Any]]:
         _fetch_kucoin,
         _fetch_bybit,
         _fetch_coingecko,
+        _fetch_yahoo,   # Yahoo added back as fallback
     ]
 
     price = None
@@ -613,6 +634,7 @@ def analyze_technicals(symbol: str) -> Dict[str, Any]:
 
     _set_cache(cache_key, result)
     return result
+
 # Aliases
 analyze_technicals_fast = analyze_technicals
 analyze_technicals_advanced = analyze_technicals
@@ -895,6 +917,7 @@ def diagnose_connections() -> Dict[str, Any]:
         "KuCoin": _fetch_kucoin,
         "Bybit": _fetch_bybit,
         "CoinGecko": _fetch_coingecko,
+        "Yahoo": _fetch_yahoo,   # <-- Added Yahoo
     }
     results = {}
     for name, func in fetchers.items():
