@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Constants (using DECIMAL convention: 0.02 = 2%)
 MAX_DAILY_DRAWDOWN = 0.05      # 5%
-MAX_OPEN_EXPOSURE = 0.20       # 20%
+MAX_OPEN_EXPOSURE = 0.30       # 30% (was 20%)   <--- FIXED
 CORE_ASSETS = ["BTC", "ETH", "SOL"]
 
 # In-memory cache for performance (optional)

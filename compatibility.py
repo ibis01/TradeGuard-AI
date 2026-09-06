@@ -88,6 +88,8 @@ def get_trade(trade_id: int) -> Dict[str, Any]:
         "created": trade.get("created_at", ""),
         "executed": trade.get("executed_at", ""),
         "pnl": trade.get("pnl", 0.0),
+        # Added to display rejection reason
+        "transition_metadata": trade.get("transition_metadata", ""),
         # Aliases for dashboard
         "entry": trade.get("entry_price", 0.0),
         "stop": trade.get("stop_loss", 0.0),
@@ -129,9 +131,16 @@ def screen_trade(trade_id: int) -> Dict[str, Any]:
     if result.get("status") == "SUCCESS":
         return {"status": "SUCCESS", "message": "Risk validation passed"}
     elif result.get("status") == "REJECTED":
-        return {"status": "FAILURE", "reason": result.get("reason", "Risk check failed")}
+        return {
+            "status": "FAILURE",
+            "reason": result.get("reason", "Risk check failed"),
+            "details": result.get("details", {})   # include details for debugging
+        }
     else:
-        return {"status": "FAILURE", "reason": result.get("reason", "Unknown error")}
+        return {
+            "status": "FAILURE",
+            "reason": result.get("reason", "Unknown error")
+        }
 
 
 def request_approval(trade_id: int, requested_by: str = "ai") -> Dict[str, Any]:
@@ -202,6 +211,30 @@ def execute_trade(trade_id: int, execution_price: float) -> Dict[str, Any]:
             "status": "FAILURE",
             "reason": str(e)
         }
+
+
+def get_recommended_position(asset: str, entry_price: float, stop_loss: float) -> Dict[str, Any]:
+    """
+    Get recommended position size for a trade.
+    """
+    from risk_management_mcp import get_position_recommendation
+    return get_position_recommendation(asset, entry_price, stop_loss)
+
+
+def check_daily_trading_limits() -> Dict[str, Any]:
+    """
+    Check if daily trading limits are exceeded.
+    """
+    from risk_management_mcp import check_daily_limits
+    return check_daily_limits()
+
+
+def get_risk_summary() -> Dict[str, Any]:
+    """
+    Get comprehensive risk management summary.
+    """
+    from risk_management_mcp import get_risk_summary
+    return get_risk_summary()
 
 
 # Export all functions with dashboard-compatible signatures

@@ -1,5 +1,5 @@
 """
-TradeGuard AI - Polished Streamlit Dashboard (Hackathon Ready).
+TradeGuard AI - Polished Streamlit Dashboard .
 
 Demonstrates the complete governed trading workflow with professional UI/UX.
 Core Narrative: AI investigates. Deterministic controls verify. Humans govern. Binance executes.
@@ -22,8 +22,22 @@ from compatibility import (
     TRADING_MODE
 )
 
+# Import risk constants for manual validation (single import)
+from risk_management_mcp import (
+    get_portfolio_balance,
+    MAX_RISK_PERCENT,
+    MIN_STOP_DISTANCE,
+    MAX_POSITION_PCT
+)
+
 # Import market intelligence
-from market_intelligence_mcp import get_live_market_data, check_market_data_health, clear_cache
+from market_intelligence_mcp import (
+    get_live_market_data,
+    check_market_data_health,
+    analyze_technicals_fast,
+    get_trade_recommendation,
+    clear_cache
+)
 
 # Page configuration
 st.set_page_config(
@@ -34,9 +48,8 @@ st.set_page_config(
 )
 
 # ============================================================================
-# CUSTOM CSS
+# CUSTOM CSS (kept exactly as before – omitted for brevity, but include it)
 # ============================================================================
-
 st.markdown("""
 <style>
     .main-header {
@@ -208,6 +221,15 @@ st.markdown("""
         font-weight: 600;
         display: inline-block;
     }
+    .price-source-manual {
+        background: #58a6ff;
+        color: #0d1117;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-block;
+    }
     .price-source-error {
         background: #f85149;
         color: white;
@@ -271,6 +293,59 @@ st.markdown("""
         font-size: 1.2rem;
         font-weight: 600;
     }
+    .manual-box {
+        background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+    }
+    .analysis-box {
+        background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+    }
+    .analysis-label {
+        color: #8b949e;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .analysis-value {
+        color: #e6edf3;
+        font-size: 1.1rem;
+        margin-top: 0.2rem;
+    }
+    .rr-badge-ideal {
+        background: #3fb950;
+        color: #0d1117;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+    .rr-badge-good {
+        background: #58a6ff;
+        color: #0d1117;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+    .rr-badge-poor {
+        background: #d29922;
+        color: #0d1117;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-block;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -294,6 +369,8 @@ if 'market_healthy' not in st.session_state:
     st.session_state.market_healthy = False
 if 'market_status_checked' not in st.session_state:
     st.session_state.market_status_checked = False
+if 'manual_tech_analysis' not in st.session_state:
+    st.session_state.manual_tech_analysis = None
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -315,6 +392,59 @@ def check_market_status():
             st.session_state.market_healthy = False
         st.session_state.market_status_checked = True
     return st.session_state.market_healthy
+
+def generate_technical_analysis(symbol: str, price: float, side: str = None) -> str:
+    """Generate a human-readable technical analysis with reasoning."""
+    tech_data = analyze_technicals_fast(symbol)
+    
+    trend = tech_data.get("trend", "Neutral")
+    rsi = tech_data.get("rsi", 50.0)
+    signal = tech_data.get("signal", "Neutral")
+    
+    analysis_parts = []
+    analysis_parts.append(f"📊 **Technical Analysis for {symbol}**")
+    analysis_parts.append("")
+    analysis_parts.append(f"**Current Price:** ${price:,.2f}")
+    analysis_parts.append("")
+    
+    if trend == "Bullish":
+        analysis_parts.append(f"📈 **Trend:** Bullish - Price above 10-period SMA.")
+    elif trend == "Bearish":
+        analysis_parts.append(f"📉 **Trend:** Bearish - Price below 10-period SMA.")
+    else:
+        analysis_parts.append(f"➡️ **Trend:** Neutral - No clear direction.")
+    
+    analysis_parts.append("")
+    
+    if rsi >= 70:
+        analysis_parts.append(f"⚠️ **RSI:** {rsi:.1f} - Overbought.")
+    elif rsi <= 30:
+        analysis_parts.append(f"💡 **RSI:** {rsi:.1f} - Oversold.")
+    else:
+        analysis_parts.append(f"⚖️ **RSI:** {rsi:.1f} - Neutral.")
+    
+    analysis_parts.append("")
+    
+    if signal == "Buy":
+        analysis_parts.append("🟢 **Signal:** BUY")
+    elif signal == "Sell":
+        analysis_parts.append("🔴 **Signal:** SELL")
+    else:
+        analysis_parts.append("🟡 **Signal:** HOLD")
+    
+    if side:
+        if side == "long" and signal in ["Buy", "Neutral"]:
+            analysis_parts.append(f"✅ **{side.upper()} Entry:** Technical conditions support this direction.")
+        elif side == "short" and signal in ["Sell", "Neutral"]:
+            analysis_parts.append(f"✅ **{side.upper()} Entry:** Technical conditions support this direction.")
+        else:
+            analysis_parts.append(f"⚠️ **{side.upper()} Entry:** May not strongly support this direction.")
+    
+    analysis_parts.append("")
+    analysis_parts.append("---")
+    analysis_parts.append("*Analysis based on real-time market data.*")
+    
+    return "\n".join(analysis_parts)
 
 # ============================================================================
 # HEADER
@@ -364,7 +494,7 @@ with col4:
 st.divider()
 
 # ============================================================================
-# WORKFLOW - STEP 1: AI AGENT
+# WORKFLOW - STEP 1: AI AGENT WITH 3:1 RR
 # ============================================================================
 
 st.markdown("### Governed Trading Workflow")
@@ -373,31 +503,29 @@ st.markdown("### Governed Trading Workflow")
 step_class = "active" if st.session_state.step >= 1 else ""
 st.markdown(f'<div class="workflow-step {step_class}">', unsafe_allow_html=True)
 st.markdown('<span class="step-number">1</span><div class="step-title">AI Agent Analysis & Proposal</div>', unsafe_allow_html=True)
-st.markdown('<div class="step-caption">The agent generates reproducible, safe proposals based on your objective.</div>', unsafe_allow_html=True)
+st.markdown('<div class="step-caption">The agent analyzes technical indicators and generates 3:1 risk-reward proposals.</div>', unsafe_allow_html=True)
 
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.markdown("##### 🤖 Deterministic Demo Agent")
-    st.caption("Define your objective. The agent will generate a compliant, risk-managed proposal.")
+    st.markdown("##### 🤖 AI Technical Analysis Agent")
+    st.caption("Analyzes real-time data and proposes trades with 3:1 risk-reward ratio.")
     
     user_objective = st.text_area(
         "Trading Objective", 
-        value="Find a conservative long opportunity on BTC with strict risk management.", 
+        value="Analyze SOL technically and propose the best trade with 3:1 risk-reward.", 
         height=80,
         key="user_objective_main"
     )
     
-    # Show price source info
     if is_healthy:
         st.caption("✅ Live market data available")
     else:
         st.caption("⚠️ No market data connection - using simulated prices")
     
-    if st.button("🤖 Run Agent Analysis & Propose", type="primary", key="ai_propose"):
-        with st.spinner("Generating proposal..."):
+    if st.button("🤖 Run Technical Analysis & Propose", type="primary", key="ai_propose"):
+        with st.spinner("📊 Analyzing market data..."):
             try:
-                # Parse objective
                 obj_lower = user_objective.lower()
                 symbol = "BTC"
                 if "eth" in obj_lower:
@@ -405,56 +533,85 @@ with col1:
                 elif "sol" in obj_lower:
                     symbol = "SOL"
                 
-                # Try to get REAL market data
-                market_data = get_live_market_data(symbol)
+                # Get trade recommendation with 3:1 RR
+                recommendation = get_trade_recommendation(symbol)
                 
-                if market_data:
-                    entry = market_data["last_close"]
-                    exchange = market_data["exchange"]
-                    st.success(f"📊 **LIVE DATA** - {symbol}: ${entry:,.2f} from {exchange}")
-                    price_source = "live"
+                if not recommendation.get("ok"):
+                    st.error(f"❌ Cannot analyze {symbol}: {recommendation.get('error')}")
+                    st.stop()
+                
+                side = recommendation["side"]
+                entry = recommendation["entry_price"]
+                stop = recommendation["stop_loss"]
+                take_profit = recommendation["take_profit"]
+                qty = recommendation["position_size"]
+                rr_ratio = recommendation["rr_ratio"]
+                tech = recommendation["technical_indicators"]
+                
+                st.success(f"📊 **Technical Analysis for {symbol}**")
+                
+                col1a, col2a, col3a = st.columns(3)
+                with col1a:
+                    st.metric("Trend", tech['trend'])
+                with col2a:
+                    st.metric("RSI", f"{tech['rsi']:.1f}")
+                with col3a:
+                    st.metric("Signal", tech['signal'])
+                
+                if rr_ratio >= 3.0:
+                    st.markdown('<span class="rr-badge-ideal">🌟 IDEAL 3:1 Risk-Reward</span>', unsafe_allow_html=True)
+                elif rr_ratio >= 2.0:
+                    st.markdown('<span class="rr-badge-good">✅ Good 2:1 Risk-Reward</span>', unsafe_allow_html=True)
                 else:
-                    # Use fallback only if API fails
-                    fallback_prices = {"BTC": 60000.0, "ETH": 3000.0, "SOL": 150.0}
-                    entry = fallback_prices.get(symbol, 60000.0)
-                    st.warning(f"⚠️ **SIMULATED DATA** - Using fallback price for {symbol}: ${entry:,.2f}")
-                    st.info("💡 Market data unavailable. Using simulated price for demonstration.")
-                    price_source = "simulated"
+                    st.markdown('<span class="rr-badge-poor">⚠️ Poor Risk-Reward</span>', unsafe_allow_html=True)
                 
-                # Determine side and stop loss
-                if "short" in obj_lower:
-                    side = "short"
-                    stop = entry * 1.01
+                st.markdown(f"""
+                **💡 Recommendation: {side.upper()} {symbol}**
+                - **Entry:** ${entry:,.2f}
+                - **Stop Loss:** ${stop:,.2f} ({((abs(entry-stop))/entry)*100:.2f}% risk)
+                - **Take Profit:** ${take_profit:,.2f} ({((abs(take_profit-entry))/entry)*100:.2f}% reward)
+                - **Risk-Reward:** {rr_ratio:.1f}:1
+                - **Position:** {qty:.4f} {symbol} (${recommendation['position_value']:,.2f})
+                - **Risk:** ${recommendation['risk_amount']:.2f} ({recommendation['risk_percent']:.1f}% of account)
+                """)
+                
+                with st.expander("📝 View Full Reasoning", expanded=False):
+                    st.markdown(recommendation['reasoning'])
+                
+                # =============================================================
+                # Only propose if side is NOT neutral and RR is valid
+                # =============================================================
+                if side != "neutral" and recommendation.get('risk_reward_valid', False):
+                    st.success(f"✅ RR {rr_ratio:.1f}:1 meets minimum (≥ {recommendation['min_rr_ratio']:.1f}:1)")
+                    
+                    # Auto-propose
+                    reasoning = f"{recommendation['reasoning']}\n\nRisk-Reward: {rr_ratio:.1f}:1"
+                    
+                    prop = propose_trade(
+                        symbol=symbol,
+                        side=side,
+                        quantity=qty,
+                        entry_price=entry,
+                        stop_loss=stop,
+                        take_profit=take_profit,
+                        reasoning=reasoning
+                    )
+                    st.session_state.trade_id = prop["trade_id"]
+                    st.session_state.step = 1
+                    st.session_state.execution_price = entry
+                    st.session_state.price_source = "live" if is_healthy else "simulated"
+                    st.success("✅ Trade proposed successfully!")
+                    st.rerun()
                 else:
-                    side = "long"
-                    stop = entry * 0.99
-                
-                # Quantity based on asset
-                quantities = {"BTC": 0.01, "ETH": 0.5, "SOL": 10.0}
-                qty = quantities.get(symbol, 0.01)
-                
-                reasoning = (
-                    f"Agent Analysis: User requested '{user_objective}'. "
-                    f"Generated {side.upper()} proposal for {symbol} "
-                    f"adhering to 2% risk cap. Price source: {price_source.upper()}"
-                )
-                
-                prop = propose_trade(
-                    symbol=symbol,
-                    side=side,
-                    quantity=qty,
-                    entry_price=entry,
-                    stop_loss=stop,
-                    reasoning=reasoning
-                )
-                st.session_state.trade_id = prop["trade_id"]
-                st.session_state.step = 1
-                st.session_state.execution_price = entry
-                st.session_state.price_source = price_source
-                st.rerun()
+                    # No clear signal – show info and do not propose
+                    if side == "neutral":
+                        st.warning("⚠️ No clear trade signal detected. The analysis suggests **HOLD**. No trade proposed.")
+                        st.info("💡 You can still manually enter a trade below if you have a different view.")
+                    else:
+                        st.warning("⚠️ Risk-Reward ratio does not meet minimum. No trade proposed.")
                 
             except Exception as e:
-                st.error(f"❌ Proposal failed: {e}")
+                st.error(f"❌ Analysis failed: {e}")
 
 with col2:
     st.markdown("##### 🧪 Security Demo")
@@ -466,7 +623,7 @@ with col2:
             prop = propose_trade(
                 symbol="BTC", side="long", quantity=100.0,
                 entry_price=60000.0, stop_loss=59500.0,
-                reasoning="Unsafe AI Proposal: Ignoring risk limits for maximum gains!"
+                reasoning="Unsafe AI Proposal: Ignoring risk limits!"
             )
             st.session_state.trade_id = prop["trade_id"]
             st.session_state.step = 1
@@ -478,6 +635,219 @@ with col2:
             st.error(f"❌ Proposal failed: {e}")
 
 st.markdown('</div>', unsafe_allow_html=True)
+
+# ============================================================================
+# MANUAL PROPOSAL SECTION (UPDATED WITH TP)
+# ============================================================================
+
+st.markdown("### ✍️ Manual Proposal Entry")
+st.caption("Manually define trade parameters with 3:1 risk-reward guidance.")
+
+with st.expander("📝 Manual Trade Entry", expanded=False):
+    st.markdown('<div class="manual-box">', unsafe_allow_html=True)
+    
+    col_man1, col_man2 = st.columns(2)
+    
+    with col_man1:
+        manual_symbol = st.selectbox(
+            "Asset",
+            ["BTC", "ETH", "SOL"],
+            index=0,
+            key="manual_symbol"
+        )
+        
+        manual_side = st.radio(
+            "Direction",
+            ["long", "short"],
+            horizontal=True,
+            key="manual_side"
+        )
+        
+        manual_market_data = get_live_market_data(manual_symbol)
+        if manual_market_data:
+            default_price = manual_market_data["last_close"]
+            st.caption(f"✅ Live {manual_symbol}: ${default_price:,.2f}")
+        else:
+            default_price = 60000.0 if manual_symbol == "BTC" else (3000.0 if manual_symbol == "ETH" else 150.0)
+            st.caption(f"⚠️ Using simulated price for {manual_symbol}")
+        
+        manual_entry = st.number_input(
+            "Entry Price",
+            value=default_price,
+            step=10.0,
+            format="%.2f",
+            key="manual_entry_price"
+        )
+        
+        default_stop = manual_entry * 0.985 if manual_side == "long" else manual_entry * 1.015
+        manual_stop = st.number_input(
+            "Stop Loss",
+            value=default_stop,
+            step=10.0,
+            format="%.2f",
+            key="manual_stop_price",
+            help="Long: Stop below entry | Short: Stop above entry"
+        )
+        
+        # Take Profit with 3:1 RR suggestion
+        risk = abs(manual_entry - manual_stop)
+        suggested_tp = manual_entry + (risk * 3.0) if manual_side == "long" else manual_entry - (risk * 3.0)
+        
+        manual_take_profit = st.number_input(
+            "Take Profit (3:1 RR suggested)",
+            value=suggested_tp,
+            step=10.0,
+            format="%.2f",
+            key="manual_tp_price",
+            help="3:1 risk-reward ratio is ideal"
+        )
+    
+    with col_man2:
+        st.markdown("##### Position Sizing")
+        
+        risk_per_unit = abs(manual_entry - manual_stop)
+        risk_percent_of_price = (risk_per_unit / manual_entry) * 100 if manual_entry > 0 else 0
+        
+        st.caption(f"📊 Risk per unit: ${risk_per_unit:,.2f} ({risk_percent_of_price:.2f}% of entry)")
+        
+        account_size = 10000.0
+        recommended_risk = account_size * 0.02
+        recommended_size = recommended_risk / risk_per_unit if risk_per_unit > 0 else 0.01
+        
+        st.info(f"💡 Recommended size: {recommended_size:.4f} {manual_symbol} (${recommended_risk:.2f} risk)")
+        
+        manual_quantity = st.number_input(
+            "Quantity",
+            value=min(recommended_size, 0.1),
+            step=0.001,
+            format="%.4f",
+            key="manual_quantity"
+        )
+        
+        total_risk = risk_per_unit * manual_quantity
+        st.metric("Total Risk", f"${total_risk:,.2f}")
+        
+        # Show RR ratio
+        if manual_take_profit > 0:
+            reward = abs(manual_take_profit - manual_entry)
+            rr_ratio = reward / risk_per_unit if risk_per_unit > 0 else 0
+            if rr_ratio >= 3.0:
+                st.success(f"✅ RR Ratio: {rr_ratio:.1f}:1 (IDEAL)")
+            elif rr_ratio >= 2.0:
+                st.info(f"ℹ️ RR Ratio: {rr_ratio:.1f}:1 (Good)")
+            else:
+                st.warning(f"⚠️ RR Ratio: {rr_ratio:.1f}:1 (Below min)")
+        
+        manual_reasoning = st.text_area(
+            "Reasoning (Optional)",
+            value=f"Manual trade: {manual_side.upper()} {manual_quantity} {manual_symbol} at ${manual_entry:,.2f}",
+            height=70,
+            key="manual_reasoning"
+        )
+        
+        if st.button("📊 Fetch Technical Analysis", key="fetch_tech_analysis"):
+            with st.spinner("Analyzing market data..."):
+                st.session_state.manual_tech_analysis = generate_technical_analysis(
+                    manual_symbol, 
+                    manual_entry,
+                    manual_side
+                )
+                st.rerun()
+        
+        if st.session_state.manual_tech_analysis:
+            st.markdown(st.session_state.manual_tech_analysis)
+        
+        st.divider()
+        
+        # ================================================================
+        # SUBMIT MANUAL PROPOSAL BUTTON (with all validations)
+        # ================================================================
+        if st.button("📤 Submit Manual Proposal", type="primary", key="submit_manual"):
+            if manual_entry <= 0:
+                st.error("❌ Entry price must be positive")
+            elif manual_stop <= 0:
+                st.error("❌ Stop loss must be positive")
+            elif manual_entry == manual_stop:
+                st.error("❌ Entry and stop loss cannot be equal")
+            elif manual_quantity <= 0:
+                st.error("❌ Quantity must be positive")
+            elif manual_take_profit <= 0:
+                st.error("❌ Take profit must be positive")
+            else:
+                try:
+                    # 1. Direction checks
+                    if manual_side == "long" and manual_stop >= manual_entry:
+                        st.error(f"❌ Stop ({manual_stop}) must be below entry ({manual_entry})")
+                        st.stop()
+                    if manual_side == "short" and manual_stop <= manual_entry:
+                        st.error(f"❌ Stop ({manual_stop}) must be above entry ({manual_entry})")
+                        st.stop()
+                    if manual_side == "long" and manual_take_profit <= manual_entry:
+                        st.error(f"❌ TP ({manual_take_profit}) must be above entry ({manual_entry})")
+                        st.stop()
+                    if manual_side == "short" and manual_take_profit >= manual_entry:
+                        st.error(f"❌ TP ({manual_take_profit}) must be below entry ({manual_entry})")
+                        st.stop()
+
+                    # 2. Stop distance check (≥ 0.5%)
+                    stop_distance_pct = abs(manual_entry - manual_stop) / manual_entry
+                    if stop_distance_pct < MIN_STOP_DISTANCE:
+                        st.error(f"❌ Stop loss is too tight: {stop_distance_pct*100:.2f}% (minimum {MIN_STOP_DISTANCE*100}%)")
+                        st.info("Please widen the stop loss (e.g., increase distance between entry and stop).")
+                        st.stop()
+
+                    # 3. Risk check (≤ 1.5% of account)
+                    try:
+                        account_balance = get_portfolio_balance()
+                    except:
+                        account_balance = 10000.0  # fallback
+
+                    risk_amount = abs(manual_entry - manual_stop) * manual_quantity
+                    risk_pct = risk_amount / account_balance if account_balance > 0 else 0
+                    if risk_pct > MAX_RISK_PERCENT:
+                        st.error(f"❌ Risk amount ${risk_amount:.2f} is {risk_pct*100:.2f}% of account (max {MAX_RISK_PERCENT*100}%)")
+                        st.info("Please reduce position size or tighten the stop loss.")
+                        st.stop()
+
+                    # 4. Position size check (with helpful max quantity suggestion)
+                    position_value = manual_entry * manual_quantity
+                    position_pct = position_value / account_balance if account_balance > 0 else 0
+                    if position_pct > MAX_POSITION_PCT:
+                        max_allowed_qty = (account_balance * MAX_POSITION_PCT) / manual_entry
+                        st.error(
+                            f"❌ Position size {position_pct*100:.2f}% exceeds {MAX_POSITION_PCT*100}% max\n\n"
+                            f"**Maximum allowed quantity for {manual_symbol} at ${manual_entry:,.2f} is {max_allowed_qty:.4f}.**"
+                        )
+                        st.info("Please reduce the quantity to the suggested maximum or choose a smaller position.")
+                        st.stop()
+
+                    # Build final reasoning
+                    reasoning = manual_reasoning
+                    if st.session_state.manual_tech_analysis:
+                        reasoning += f"\n\nTechnical Analysis:\n{st.session_state.manual_tech_analysis[:300]}..."
+
+                    # Submit the trade
+                    prop = propose_trade(
+                        symbol=manual_symbol,
+                        side=manual_side,
+                        quantity=manual_quantity,
+                        entry_price=manual_entry,
+                        stop_loss=manual_stop,
+                        take_profit=manual_take_profit,
+                        reasoning=reasoning
+                    )
+
+                    st.session_state.trade_id = prop["trade_id"]
+                    st.session_state.step = 1
+                    st.session_state.execution_price = manual_entry
+                    st.session_state.price_source = "manual"
+                    st.success("✅ Manual proposal submitted!")
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"❌ Manual proposal failed: {e}")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================================
 # DISPLAY CURRENT TRADE
@@ -495,15 +865,15 @@ if st.session_state.trade_id:
         risk_pct = safe_float(trade.get('risk_percent'))
         risk_amt = safe_float(trade.get('risk_amount'))
         
-        # Show price source badge
         if st.session_state.price_source == "live":
             st.markdown('<span class="price-source-live">🟢 Live Price</span>', unsafe_allow_html=True)
         elif st.session_state.price_source == "simulated":
             st.markdown('<span class="price-source-simulated">🟡 Simulated Price</span>', unsafe_allow_html=True)
+        elif st.session_state.price_source == "manual":
+            st.markdown('<span class="price-source-manual">🔵 Manual Entry</span>', unsafe_allow_html=True)
         elif st.session_state.price_source == "demo":
             st.markdown('<span class="price-source-error">🔴 Demo Only</span>', unsafe_allow_html=True)
         
-        # Trade metrics
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.markdown(f'<div class="metric-box"><div class="metric-label">Asset</div><div class="metric-value">{trade.get("symbol", "N/A")}</div></div>', unsafe_allow_html=True)
@@ -534,12 +904,56 @@ if st.session_state.trade_id:
         
         st.markdown(f"**📝 Reasoning:** {trade.get('reasoning', 'N/A')}")
         
+        # ================================================================
+        # UPDATED: Display rejection reason for rejected trades
+        # ================================================================
+        # dashboard.py (around the rejection display section)
+
+if st.session_state.trade_id:
+    trade = get_trade(st.session_state.trade_id)
+    
+    if trade and trade.get('status') != 'not_found':
+        st.markdown("##### Trade Proposal Details")
+        # ... (display metrics and reasoning)
+        st.markdown(f"**📝 Reasoning:** {trade.get('reasoning', 'N/A')}")
+
+        # --- Display rejection reason if rejected ---
+        if trade.get('status') == 'rejected':   # <-- this must be INSIDE the if block
+            st.warning("❌ Trade was rejected")
+            reason = trade.get('rejection_reason', '')
+            if reason:
+                st.error(f"**Rejection Reason:** {reason}")
+            else:
+                meta = trade.get('transition_metadata', '')
+                if meta:
+                    try:
+                        import json
+                        data = json.loads(meta)
+                        if 'risk_result' in data:
+                            reason = data['risk_result'].get('reason', '')
+                            details = data['risk_result'].get('details', {})
+                        elif 'exposure_result' in data:
+                            reason = data['exposure_result'].get('reason', '')
+                            details = data['exposure_result'].get('details', {})
+                        else:
+                            reason = data.get('reason', '')
+                            details = {}
+                        if reason:
+                            st.error(f"**Rejection Reason:** {reason}")
+                            if details:
+                                with st.expander("🔍 View rejection details"):
+                                    st.json(details)
+                        else:
+                            st.info("No detailed rejection reason available.")
+                    except:
+                        st.info("No detailed rejection reason available.")
+                else:
+                    st.info("No detailed rejection reason available. Run risk validation to see details.")
+
         st.divider()
         
-        # ====================================================================
-        # STEP 2: RISK ENGINE
-        # ====================================================================
         
+        # STEP 2: RISK ENGINE
         step_class = "active" if st.session_state.step >= 2 else ""
         if trade.get('status') == 'rejected': 
             step_class = "rejected"
@@ -548,33 +962,37 @@ if st.session_state.trade_id:
         
         st.markdown(f'<div class="workflow-step {step_class}">', unsafe_allow_html=True)
         st.markdown('<span class="step-number">2</span><div class="step-title">Deterministic Risk Engine Validates</div>', unsafe_allow_html=True)
-        st.markdown('<div class="step-caption">Independent risk validation enforces hard limits. The agent cannot override these checks.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="step-caption">Independent risk validation enforces hard limits.</div>', unsafe_allow_html=True)
         
         if trade.get('status') == 'proposed':
             if st.button("🔍 Run Risk Validation", type="primary", key="risk_validate"):
                 with st.spinner("Running risk validation..."):
                     result = screen_trade(st.session_state.trade_id)
                     if result.get('status') == 'SUCCESS':
-                        st.success("✅ Risk validation PASSED - All checks cleared")
-                        st.info("Trade moved to AWAITING_APPROVAL status")
+                        st.success("✅ Risk validation PASSED")
+                        st.info("Trade moved to AWAITING_APPROVAL")
                         st.session_state.step = 2
                         st.rerun()
                     else:
-                        st.error(f"❌ Risk validation REJECTED: {result.get('reason', 'Unknown')}")
-                        st.markdown('<div class="warning-box">⚠️ <strong>Key Demo Point:</strong> The proposal violated deterministic risk controls (e.g., 2% risk cap). TradeGuard blocked it automatically.</div>', unsafe_allow_html=True)
+                        # Show detailed rejection reason
+                        reason = result.get('reason', 'Unknown reason')
+                        details = result.get('details', {})
+                        st.error("❌ Risk validation REJECTED")
+                        st.warning(f"**Reason:** {reason}")
+                        if details:
+                            with st.expander("🔍 View rejection details"):
+                                st.json(details)
+                        st.markdown('<div class="warning-box">⚠️ <strong>Key Demo Point:</strong> Trade violated risk controls. See details above.</div>', unsafe_allow_html=True)
                         st.session_state.step = 2
                         st.rerun()
         elif trade.get('status') == 'rejected':
-            st.markdown('<div class="success-box">✅ Risk engine correctly rejected unsafe trade. This demonstrates fail-closed security.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="success-box">✅ Risk engine rejected unsafe trade. Fail-closed security.</div>', unsafe_allow_html=True)
         else:
-            st.markdown('<div class="success-box">✅ Risk validation completed successfully. Trade passed all safety checks.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="success-box">✅ Risk validation completed successfully.</div>', unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # ====================================================================
         # STEP 3: HUMAN AUTHORIZATION
-        # ====================================================================
-        
         if trade.get('status') not in ['rejected']:
             step_class = "active" if st.session_state.step >= 3 else ""
             if trade.get('status') in ['approved', 'executed']: 
@@ -582,22 +1000,22 @@ if st.session_state.trade_id:
             
             st.markdown(f'<div class="workflow-step {step_class}">', unsafe_allow_html=True)
             st.markdown('<span class="step-number">3</span><div class="step-title">Human Authorization Required</div>', unsafe_allow_html=True)
-            st.markdown('<div class="step-caption">Cryptographic approval token binds approval to the exact proposal. Any modification invalidates it.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="step-caption">Cryptographic approval token binds approval to the exact proposal.</div>', unsafe_allow_html=True)
             
             if trade.get('status') == 'awaiting_approval':
                 if st.button("🎟️ Generate Approval Token", type="primary", key="gen_token"):
                     result = request_approval(st.session_state.trade_id)
                     if result.get('status') == 'success':
                         st.session_state.token = result.get('approval_token')
-                        st.success("✅ Cryptographic approval token generated")
+                        st.success("✅ Approval token generated")
                         st.rerun()
                     else:
                         st.error(f"❌ Token generation failed: {result.get('reason')}")
                 
                 if st.session_state.token:
-                    st.markdown("##### Approval Token (Cryptographically Bound)")
+                    st.markdown("##### Approval Token")
                     st.markdown(f'<div class="token-box">{st.session_state.token}</div>', unsafe_allow_html=True)
-                    st.caption("This SHA-256 hash is mathematically bound to your exact parameters. Any change invalidates the token.")
+                    st.caption("SHA-256 hash bound to your exact parameters.")
                     
                     st.divider()
                     
@@ -610,46 +1028,42 @@ if st.session_state.trade_id:
                             if entered_token.strip() == st.session_state.token:
                                 result = approve_trade(entered_token.strip())
                                 if result.get('status') == 'SUCCESS':
-                                    st.success("✅ Trade APPROVED - Authorization verified")
+                                    st.success("✅ Trade APPROVED")
                                     st.session_state.step = 4
                                     st.rerun()
                                 else:
                                     st.error(f"❌ Approval failed: {result.get('reason')}")
                             else:
-                                st.error("❌ Token mismatch - Approval rejected for security")
+                                st.error("❌ Token mismatch")
                     with col_reject:
                         if st.button("❌ Reject Trade", key="reject_trade"):
-                            st.error("❌ Trade REJECTED by human")
+                            st.error("❌ Trade REJECTED")
                             st.session_state.step = 2
                             st.rerun()
                             
             elif trade.get('status') == 'approved':
-                st.markdown('<div class="success-box">✅ Human approval verified. Trade authorized for execution.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="success-box">✅ Human approval verified.</div>', unsafe_allow_html=True)
             
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # ====================================================================
             # STEP 4: EXECUTION
-            # ====================================================================
-            
             if trade.get('status') == 'approved':
                 step_class = "active" if st.session_state.step >= 4 else ""
                 
                 st.markdown(f'<div class="workflow-step {step_class}">', unsafe_allow_html=True)
                 st.markdown('<span class="step-number">4</span><div class="step-title">Execution Gateway Executes</div>', unsafe_allow_html=True)
-                st.markdown('<div class="step-caption">Governance verifies proposal integrity and approval before executing through the adapter.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="step-caption">Governance verifies proposal integrity before executing.</div>', unsafe_allow_html=True)
                 
                 execution_price = st.session_state.execution_price or entry
-                st.markdown(f"**Execution Price:** `${execution_price:,.2f}` *(Locked to approved proposal)*")
-                st.caption("Manual input is disabled at execution. The Gateway fills at the approved price to maintain hash integrity.")
+                st.markdown(f"**Execution Price:** `${execution_price:,.2f}`")
                 
                 if st.button("🚀 Execute Trade via Adapter", type="primary", key="execute_trade"):
-                    with st.spinner(f"Executing trade in {TRADING_MODE.upper()} mode..."):
+                    with st.spinner(f"Executing in {TRADING_MODE.upper()} mode..."):
                         result = execute_trade(st.session_state.trade_id, execution_price=execution_price)
                         if result.get('status') == 'SUCCESS':
                             st.success(f"✅ Trade EXECUTED at ${execution_price:,.2f}")
                             if TRADING_MODE == "paper":
-                                st.info("📝 Paper trade simulated - no real money involved")
+                                st.info("📝 Paper trade simulated")
                             st.session_state.step = 5
                             st.rerun()
                         else:
@@ -657,7 +1071,7 @@ if st.session_state.trade_id:
                 
                 st.markdown('</div>', unsafe_allow_html=True)
             elif trade.get('status') == 'executed':
-                st.markdown('<div class="success-box">✅ Trade executed successfully. Full lifecycle complete.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="success-box">✅ Trade executed successfully.</div>', unsafe_allow_html=True)
                 
                 if trade.get('executed_at'):
                     st.info(f"📅 Executed at: {trade.get('executed_at')}")
@@ -673,15 +1087,9 @@ if st.session_state.show_rejection_demo and st.session_state.trade_id:
         st.markdown("### 🎯 Demo Summary: Risk Engine Rejection")
         st.markdown("""
         **What Just Happened:**
-        1. ✅ An unsafe trade (100 BTC) was proposed.
-        2. ✅ Deterministic risk engine evaluated the proposal.
-        3. ✅ Risk engine REJECTED the trade (exceeds 2% risk cap).
-        4. ✅ Trade cannot proceed without approval.
-        
-        **Why This Matters:**
-        - The agent cannot override deterministic risk controls.
-        - Unsafe trades are blocked automatically.
-        - This is NOT just an AI wrapper - it has independent safety.
+        1. ✅ Unsafe trade (100 BTC) was proposed
+        2. ✅ Risk engine REJECTED the trade (exceeds 2% risk cap)
+        3. ✅ Trade blocked automatically - fail-closed security
         """)
 
 # ============================================================================
@@ -690,7 +1098,7 @@ if st.session_state.show_rejection_demo and st.session_state.trade_id:
 
 st.divider()
 st.markdown("### Audit Trail - Trade History")
-st.caption("Every action is recorded for full transparency and accountability.")
+st.caption("Every action is recorded for full transparency.")
 
 history = get_trade_history(limit=10)
 
@@ -723,7 +1131,7 @@ if history.get('trades'):
                 if trade.get('executed'): 
                     st.write(f"**Executed:** {trade['executed']}")
 else:
-    st.info("📭 No trades yet. Define your objective above to start the demo.")
+    st.info("📭 No trades yet. Define your objective above to start.")
 
 # ============================================================================
 # RESET
@@ -739,6 +1147,7 @@ with col_r2:
         st.session_state.show_rejection_demo = False
         st.session_state.execution_price = None
         st.session_state.price_source = None
+        st.session_state.manual_tech_analysis = None
         clear_cache()
         st.rerun()
 
@@ -750,7 +1159,7 @@ st.divider()
 st.markdown(f"""
 <div style='text-align: center; color: #8b949e; padding: 2rem 0;'>
     <h3>🛡️ TradeGuard AI</h3>
-    <p><em>AI investigates. Deterministic controls verify. Humans govern. Binance executes. TradeGuard records.</em></p>
+    <p><em>AI investigates. Deterministic controls verify. Humans govern. Binance executes.</em></p>
     <p>Built for Binance Agent OS Mini Hackathon - Track B</p>
     <p style='font-size: 0.8rem; margin-top: 1rem;'>
         ⚡ <strong>Mode:</strong> {TRADING_MODE.upper()} · 
