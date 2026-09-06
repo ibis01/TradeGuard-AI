@@ -10,15 +10,16 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
 # --- IMPORT CANONICAL CONFIG AND SCHEMAS ---
-from config import DB_PATH
+from config import DB_PATH, MAX_OPEN_EXPOSURE
 from schemas import TradeStatus
 from risk_management_mcp import _get_real_portfolio_balance
-from config import DB_PATH, MAX_OPEN_EXPOSURE 
 
 logger = logging.getLogger(__name__)
 
-
+# Constants (using DECIMAL convention: 0.02 = 2%)
+MAX_DAILY_DRAWDOWN = 0.05      # 5%
 CORE_ASSETS = ["BTC", "ETH", "SOL"]
+# MAX_OPEN_EXPOSURE is imported from config (25%)
 
 # In-memory cache for performance (optional)
 _cache_ttl = 5  # seconds

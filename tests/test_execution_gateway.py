@@ -88,9 +88,8 @@ def test_executed_trade_rejected(clean_db):
 
 # 9. approved trade generates command using canonical DB values
 def test_approved_trade_generates_command(clean_db):
-    # Fix: Reduced quantity from 2.0 to 0.5 to pass the 20% exposure cap 
-    # (0.5 ETH * $3000 = $1500 exposure, which is 15% of the $10k portfolio)
-    tid = create_proposed_trade(symbol="ETH", side="long", quantity=0.5, entry=3000, stop=2900)
+    tid = create_proposed_trade(symbol="ETH", side="long", quantity=0.3, entry=3000, stop=2950)
+
     req = screen_and_request_approval(tid)
     
     # Ensure screening actually passed before trying to approve
@@ -101,9 +100,9 @@ def test_approved_trade_generates_command(clean_db):
     res = generate_execution_command(tid)
     assert res["status"] == "SUCCESS"
     # Fix: Update expected command to match the new quantity
-    assert res["command"] == "onchainos --dry-run long 0.5 ETH"
+    assert res["command"] == "onchainos --dry-run long 0.3 ETH"
     assert res["symbol"] == "ETH"
-    assert res["quantity"] == 0.5
+    assert res["quantity"] == 0.3
 
 # 10. proposal hash mismatch fails closed
 def test_hash_mismatch_fails_closed(clean_db):

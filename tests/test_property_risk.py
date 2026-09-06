@@ -61,7 +61,7 @@ def test_screen_trade_rejects_high_risk_proposals(clean_db):
     result = propose_trade("BTC", "long", 0.5, 60000, 59500, reasoning="test")
     screen_res = screen_trade(result["trade_id"])
     assert screen_res["status"] == "REJECTED", f"Expected REJECTED, got {screen_res}"
-    assert "2% hard cap" in screen_res["reason"]
+    assert "2.0% cap" in screen_res["reason"] 
 
 def test_risk_amount_calculation_is_deterministic(clean_db):
     result1 = propose_trade("BTC", "long", 0.01, 60000, 59500, reasoning="test")

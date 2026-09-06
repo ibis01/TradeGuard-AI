@@ -1,7 +1,7 @@
 """
 TradeGuard AI - Hardened Risk Management MCP.
 Implements deterministic risk controls that CANNOT be bypassed by the LLM.
-- 1.5% hard cap on per-trade risk.
+- 2% hard cap on per-trade risk (from config).
 - Validates all financial inputs.
 - HARD STOP on missing portfolio balance (no silent mock fallback).
 - TRUST BOUNDARY: Portfolio balance is ALWAYS fetched from the trusted treasury.
@@ -12,15 +12,16 @@ import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
 
-# Set up logging
+# Set up logging - FIXED
 logger = logging.getLogger(__name__)
 
 # Database path – uses unified config if available, otherwise falls back
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 try:
-    from config import DB_PATH
+    from config import DB_PATH, MAX_RISK_PER_TRADE
 except ImportError:
     DB_PATH = os.path.join(BASE_DIR, "data", "trades.db")
+    MAX_RISK_PER_TRADE = 0.02  # 2% fallback
 
 # Ensure the data directory exists
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -29,8 +30,8 @@ os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 # RISK MANAGEMENT CONFIGURATION
 # ============================================================================
 
-# Per-Trade Risk Limits (Professional: 1.5%)
-MAX_RISK_PERCENT = 0.015          # 1.5% of portfolio per trade
+# Per-Trade Risk Limits (now sourced from config)
+MAX_RISK_PERCENT = MAX_RISK_PER_TRADE   # 2% (from config)
 
 # Portfolio Exposure Limits
 MAX_POSITION_PCT = 0.10           # 10% max single position
@@ -38,7 +39,7 @@ MAX_TOTAL_EXPOSURE = 0.25         # 25% max total exposure
 MAX_DAILY_DRAWDOWN = 0.03         # 3% max daily loss
 MAX_WEEKLY_DRAWDOWN = 0.10        # 10% max weekly loss
 
-# Stop Loss Rules (Professional: 0.5% – 2.5%)
+# Stop Loss Rules
 MIN_STOP_DISTANCE = 0.005         # 0.5% minimum
 MAX_STOP_DISTANCE = 0.025         # 2.5% maximum
 
@@ -46,7 +47,7 @@ MAX_STOP_DISTANCE = 0.025         # 2.5% maximum
 MIN_POSITION_SIZE = {
     "BTC": 0.0001,
     "ETH": 0.001,
-    "SOL": 0.01,      # increased from 0.001
+    "SOL": 0.01,
     "DEFAULT": 0.0001
 }
 
@@ -73,6 +74,26 @@ _daily_tracker = {
     "last_trade_date": None
 }
 
+
+def _ensure_treasury_table(conn: sqlite3.Connection):
+    """Ensure treasury table exists with correct schema."""
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS treasury (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            current_balance REAL NOT NULL DEFAULT 10000.0,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            note TEXT
+        )
+    """)
+    # Check if 'note' column exists and add if missing
+    cursor.execute("PRAGMA table_info(treasury)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'note' not in columns:
+        cursor.execute("ALTER TABLE treasury ADD COLUMN note TEXT")
+    conn.commit()
+
+
 # ============================================================================
 # 1. PORTFOLIO BALANCE (HARD STOP ON FAILURE)
 # ============================================================================
@@ -80,7 +101,7 @@ _daily_tracker = {
 def _get_real_portfolio_balance(use_cache: bool = True) -> float:
     """
     Fetches the REAL portfolio balance from the treasury table.
-    If the balance cannot be retrieved, it raises a Hard Stop error.
+    If the balance cannot be retrieved or is not positive, it raises a Hard Stop error.
     NEVER silently falls back to a default during active trading.
     """
     global _balance_cache
@@ -94,17 +115,10 @@ def _get_real_portfolio_balance(use_cache: bool = True) -> float:
     try:
         conn = sqlite3.connect(DB_PATH, timeout=30)
         conn.execute("PRAGMA journal_mode=WAL;")
-        cursor = conn.cursor()
         
-        # Create treasury table if it doesn't exist
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS treasury (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                current_balance REAL NOT NULL DEFAULT 10000.0,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                note TEXT
-            )
-        """)
+        _ensure_treasury_table(conn)
+        
+        cursor = conn.cursor()
         
         # Check if treasury has data
         cursor.execute("SELECT COUNT(*) FROM treasury")
@@ -126,13 +140,13 @@ def _get_real_portfolio_balance(use_cache: bool = True) -> float:
         
         if row and row[0] is not None:
             balance = float(row[0])
-            if balance > 0:
-                # Update cache
-                _balance_cache["value"] = balance
-                _balance_cache["timestamp"] = datetime.now(timezone.utc)
-                return balance
-            else:
+            # HARD STOP on non-positive balance
+            if balance <= 0:
                 raise ValueError(f"Treasury balance is zero or negative. Got: {balance}")
+            # Update cache
+            _balance_cache["value"] = balance
+            _balance_cache["timestamp"] = datetime.now(timezone.utc)
+            return balance
         else:
             raise ValueError("Treasury table exists but contains no valid balance row.")
             
@@ -150,15 +164,17 @@ def get_portfolio_balance() -> float:
     """Public wrapper to get the current portfolio balance."""
     return _get_real_portfolio_balance()
 
+
 # ============================================================================
-# 2. POSITION SIZING CALCULATOR
+# 2. POSITION SIZING CALCULATOR (CORRECTED)
 # ============================================================================
 
 def calculate_position_size(
     entry: float, 
     stop: float,
     risk_percent: float = MAX_RISK_PERCENT,
-    account_balance: Optional[float] = None
+    account_balance: Optional[float] = None,
+    apply_cap: bool = True
 ) -> Dict[str, Any]:
     """
     Calculates the position size based on the risk cap.
@@ -166,8 +182,9 @@ def calculate_position_size(
     Args:
         entry: Entry price
         stop: Stop loss price
-        risk_percent: Risk percentage (default: 1.5%)
+        risk_percent: Risk percentage (default: 2% from config)
         account_balance: Optional override for testing
+        apply_cap: If True, cap position size at MAX_POSITION_PCT (default True)
     
     Returns:
         Dict with position sizing details
@@ -191,14 +208,14 @@ def calculate_position_size(
     risk_per_unit = abs(entry - stop)
     position_size = risk_amount / risk_per_unit
     
-    # Cap position size at 10% of portfolio
-    max_position_value = portfolio_balance * MAX_POSITION_PCT
-    max_position_size = max_position_value / entry
-    
-    if position_size > max_position_size:
-        position_size = max_position_size
-        risk_amount = position_size * risk_per_unit
-        risk_percent = risk_amount / portfolio_balance
+    # Apply cap if requested
+    if apply_cap:
+        max_position_value = portfolio_balance * MAX_POSITION_PCT
+        max_position_size = max_position_value / entry
+        if position_size > max_position_size:
+            position_size = max_position_size
+            risk_amount = position_size * risk_per_unit
+            risk_percent = risk_amount / portfolio_balance
     
     position_value = position_size * entry
     exposure_pct = position_value / portfolio_balance
@@ -215,6 +232,7 @@ def calculate_position_size(
         "risk_per_unit": round(risk_per_unit, 2),
         "max_position_pct": MAX_POSITION_PCT * 100
     }
+
 
 # ============================================================================
 # 3. RISK-REWARD CALCULATOR
@@ -273,6 +291,7 @@ def calculate_risk_reward(
         "min_required": MIN_RR_RATIO,
         "ideal": IDEAL_RR_RATIO
     }
+
 
 # ============================================================================
 # 4. DAILY TRACKING
@@ -358,6 +377,7 @@ def check_daily_limits() -> Dict[str, Any]:
         "trades_today": _daily_tracker["trades_today"],
         "daily_pnl": _daily_tracker["daily_pnl"]
     }
+
 
 # ============================================================================
 # 5. HARDCODED VETO GATE (AUTHORISATION)
@@ -591,6 +611,7 @@ def evaluate_trade_risk(
         }
     }
 
+
 # ============================================================================
 # 6. GET RISK RECOMMENDATIONS
 # ============================================================================
@@ -649,6 +670,7 @@ def get_position_recommendation(
             "message": "Failed to calculate position recommendation"
         }
 
+
 # ============================================================================
 # 7. GET RISK SUMMARY
 # ============================================================================
@@ -689,6 +711,14 @@ def get_risk_summary() -> Dict[str, Any]:
             "message": "Failed to get risk summary"
         }
 
+
+def reset_cache():
+    """Reset the balance cache."""
+    global _balance_cache
+    _balance_cache["value"] = None
+    _balance_cache["timestamp"] = None
+    logger.info("Risk management cache reset")
+
 # ============================================================================
 # 8. SEED TREASURY
 # ============================================================================
@@ -703,17 +733,10 @@ def seed_treasury(initial_balance: float = 10000.0) -> Dict[str, Any]:
     try:
         conn = sqlite3.connect(DB_PATH, timeout=30)
         conn.execute("PRAGMA journal_mode=WAL;")
+        _ensure_treasury_table(conn)
         cursor = conn.cursor()
         
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS treasury (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                current_balance REAL NOT NULL,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                note TEXT
-            )
-        """)
-        
+        # Clear existing and insert new
         cursor.execute("DELETE FROM treasury")
         cursor.execute(
             "INSERT INTO treasury (current_balance, note) VALUES (?, ?)",
@@ -740,6 +763,7 @@ def seed_treasury(initial_balance: float = 10000.0) -> Dict[str, Any]:
             "status": "error",
             "message": f"Failed to seed treasury: {str(e)}"
         }
+
 
 # ============================================================================
 # 9. DASHBOARD COMPATIBILITY WRAPPER
@@ -791,6 +815,7 @@ def check_trade_risk_for_dashboard(
             "risk_percent": 0,
             "risk_amount": 0
         }
+
 
 # ============================================================================
 # 10. SELF-TEST

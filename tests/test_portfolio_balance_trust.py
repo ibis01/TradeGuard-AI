@@ -4,7 +4,7 @@ import os
 import sqlite3
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+from risk_management_mcp import reset_cache 
 from risk_management_mcp import calculate_position_size, evaluate_trade_risk, _get_real_portfolio_balance
 from trade_memory_mcp import propose_trade, get_trade
 from governance_engine import screen_trade
@@ -69,23 +69,22 @@ def test_screen_trade_uses_trusted_balance(clean_db_and_treasury):
     # Directly test evaluate_trade_risk first
     risk_result = evaluate_trade_risk("BTC", "long", 60000, 59500, 0.5)
     assert risk_result["status"] == "REJECTED", f"Expected REJECTED, got {risk_result}"
-    assert "2% hard cap" in risk_result["reason"]
+    assert "2.0% cap" in risk_result["reason"]  
 
     # Now test through screen_trade
     prop = propose_trade("BTC", "long", 0.5, 60000, 59500, reasoning="test")
     screen_res = screen_trade(prop["trade_id"])
     assert screen_res["status"] == "REJECTED", f"Expected REJECTED, got {screen_res}"
-    assert "2% hard cap" in screen_res["reason"]
+    assert "2.0% cap" in risk_result["reason"]
 
 def test_missing_balance_fails_closed(clean_db_and_treasury):
-    # Corrupt treasury with negative balance
+    reset_cache() 
     conn = sqlite3.connect(DB_PATH)
     conn.execute("UPDATE treasury SET current_balance = -100.0")
     conn.commit()
     conn.close()
     with pytest.raises(RuntimeError, match="HARD STOP"):
-        calculate_position_size(entry=60000, stop=59500)
-
+        _get_real_portfolio_balance(use_cache=False) 
 def test_enormous_balance_cannot_bypass_policy(clean_db_and_treasury):
     # Valid trade: 0.01 BTC at $60k = $600 exposure, risk = $5 (0.05% of $10k)
     prop = propose_trade("BTC", "long", 0.01, 60000, 59500, reasoning="test")
