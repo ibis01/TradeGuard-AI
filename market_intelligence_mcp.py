@@ -173,13 +173,13 @@ def get_live_market_data(symbol: str) -> Optional[Dict[str, Any]]:
         _fetch_kucoin,
         _fetch_bybit,
         _fetch_coingecko,
-        _fetch_yahoo,   # Yahoo added back as fallback
+        _fetch_yahoo,   
     ]
 
     price = None
     exchange = "Unknown"
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(fetchers)) as executor:
         future_to_name = {
             executor.submit(f, symbol): f.__name__.replace('_fetch_', '').capitalize()
             for f in fetchers
