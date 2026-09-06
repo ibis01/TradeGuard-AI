@@ -534,45 +534,49 @@ def analyze_technicals(symbol: str) -> Dict[str, Any]:
 
     recommendation_reason = " • " + "\n • ".join(reasons)
 
-    # ---- Detailed Report ----
-    report = f"""📊 **Detailed Technical Analysis for {symbol}**
+    # ---- Align signal with recommendation to avoid UI contradiction ----
+    if "BUY" in recommendation:
+        signal = "Buy"
+    elif "SELL" in recommendation:
+        signal = "Sell"
+    else:
+        signal = "Hold"
 
-💰 **Price:** ${price:,.2f}
-📈 **Trend:** {trend} (Score: {score})
-🎯 **Signal:** {signal} (Confidence: {confidence:.1f}%)
-📝 **Recommendation:** **{recommendation}**
-
-**Why {recommendation}?**
-{recommendation_reason}
-
-📉 **Moving Averages:**
-  • SMA 10: ${ind['sma_10']:,.2f}
-  • SMA 20: ${ind['sma_20']:,.2f}
-  • SMA 50: ${ind['sma_50']:,.2f}
-  • SMA 200: ${ind['sma_200']:,.2f}
-  • EMA 9: ${ind['ema_9']:,.2f}
-  • EMA 21: ${ind['ema_21']:,.2f}
-
-📊 **Oscillators:**
-  • RSI (14): {rsi_val:.1f} {"(Overbought)" if rsi_val > 70 else "(Oversold)" if rsi_val < 30 else "(Neutral)"}
-  • MACD: {macd_obj['macd']:.4f} (Signal: {macd_obj['signal']:.4f})
-  • MACD Histogram: {macd_obj['histogram']:.4f}
-  • Stochastic RSI: K={stoch_obj['k']:.1f}, D={stoch_obj['d']:.1f}
-
-📈 **Volatility:**
-  • ATR (14): ${ind['atr']:,.2f}
-  • BB Upper: ${bb['upper']:,.2f}
-  • BB Middle: ${bb['middle']:,.2f}
-  • BB Lower: ${bb['lower']:,.2f}
-  • Volatility: {ind['volatility']:.2f}%
-
-🛡️ **Key Levels:**
-  • Support (20h): {f"${ind['support']:,.2f}" if ind['support'] else "N/A"}
-  • Resistance (20h): {f"${ind['resistance']:,.2f}" if ind['resistance'] else "N/A"}
-
-📝 **Summary:** {trend} market with {signal} signal. RSI {rsi_val:.1f} indicates {'overbought' if rsi_val > 70 else 'oversold' if rsi_val < 30 else 'neutral'} conditions.
-MACD is {'bullish' if macd_obj['histogram'] > 0 else 'bearish'}.
-Consider {recommendation.lower()} based on current setup."""
+    # ---- Detailed Report (without emojis for compatibility) ----
+    report = (
+        f"**Detailed Technical Analysis for {symbol}**\n\n"
+        f"**Price:** ${price:,.2f}\n"
+        f"**Trend:** {trend} (Score: {score})\n"
+        f"**Signal:** {signal} (Confidence: {confidence:.1f}%)\n"
+        f"**Recommendation:** {recommendation}\n\n"
+        f"**Why {recommendation}?**\n{recommendation_reason}\n\n"
+        f"**Moving Averages:**\n"
+        f"  • SMA 10: ${ind['sma_10']:,.2f}\n"
+        f"  • SMA 20: ${ind['sma_20']:,.2f}\n"
+        f"  • SMA 50: ${ind['sma_50']:,.2f}\n"
+        f"  • SMA 200: ${ind['sma_200']:,.2f}\n"
+        f"  • EMA 9: ${ind['ema_9']:,.2f}\n"
+        f"  • EMA 21: ${ind['ema_21']:,.2f}\n\n"
+        f"**Oscillators:**\n"
+        f"  • RSI (14): {rsi_val:.1f} "
+        f"{'(Overbought)' if rsi_val > 70 else '(Oversold)' if rsi_val < 30 else '(Neutral)'}\n"
+        f"  • MACD: {macd_obj['macd']:.4f} (Signal: {macd_obj['signal']:.4f})\n"
+        f"  • MACD Histogram: {macd_obj['histogram']:.4f}\n"
+        f"  • Stochastic RSI: K={stoch_obj['k']:.1f}, D={stoch_obj['d']:.1f}\n\n"
+        f"**Volatility:**\n"
+        f"  • ATR (14): ${ind['atr']:,.2f}\n"
+        f"  • BB Upper: ${bb['upper']:,.2f}\n"
+        f"  • BB Middle: ${bb['middle']:,.2f}\n"
+        f"  • BB Lower: ${bb['lower']:,.2f}\n"
+        f"  • Volatility: {ind['volatility']:.2f}%\n\n"
+        f"**Key Levels:**\n"
+        f"  • Support (20h): {f'${ind['support']:,.2f}' if ind['support'] else 'N/A'}\n"
+        f"  • Resistance (20h): {f'${ind['resistance']:,.2f}' if ind['resistance'] else 'N/A'}\n\n"
+        f"**Summary:** {trend} market with {signal} signal. RSI {rsi_val:.1f} indicates "
+        f"{'overbought' if rsi_val > 70 else 'oversold' if rsi_val < 30 else 'neutral'} conditions. "
+        f"MACD is {'bullish' if macd_obj['histogram'] > 0 else 'bearish'}.\n"
+        f"Consider {recommendation.lower()} based on current setup."
+    )
 
     result = {
         "ok": True,
@@ -609,7 +613,6 @@ Consider {recommendation.lower()} based on current setup."""
 
     _set_cache(cache_key, result)
     return result
-
 # Aliases
 analyze_technicals_fast = analyze_technicals
 analyze_technicals_advanced = analyze_technicals
