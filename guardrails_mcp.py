@@ -13,12 +13,11 @@ from datetime import datetime, timezone
 from config import DB_PATH
 from schemas import TradeStatus
 from risk_management_mcp import _get_real_portfolio_balance
+from config import DB_PATH, MAX_OPEN_EXPOSURE 
 
 logger = logging.getLogger(__name__)
 
-# Constants (using DECIMAL convention: 0.02 = 2%)
-MAX_DAILY_DRAWDOWN = 0.05      # 5%
-MAX_OPEN_EXPOSURE = 0.30       # 30% (was 20%)   <--- FIXED
+
 CORE_ASSETS = ["BTC", "ETH", "SOL"]
 
 # In-memory cache for performance (optional)

@@ -137,7 +137,7 @@ def ensure_schema():
     "execution_price": "REAL",
     "approved_by": "TEXT",
     "take_profit": "REAL",
-    "rejection_reason": "TEXT",  
+    "rejection_reason": "TEXT",   # 
 }
     
     for col, col_type in new_cols.items():
